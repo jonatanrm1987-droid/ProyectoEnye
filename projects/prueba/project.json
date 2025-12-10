@@ -3,65 +3,34 @@
         "id": "proj_1765339914_dc0b3a90",
         "slug": "prueba",
         "createdAt": "2025-12-10T05:11:54+01:00",
-        "modifiedAt": "2025-12-10T06:32:31+01:00"
+        "modifiedAt": "2025-12-10T11:48:45+01:00"
     },
     "scene_collection": {
         "title": "prueba",
         "author": "",
         "created": "2025-12-10",
-        "start_scene": "scene1",
+        "start_scene": "2",
         "scenes": {
-            "scene1": {
-                "id": "scene1",
-                "title": "Escena Inicio",
+            "2": {
+                "id": 2,
+                "title": "Primera",
                 "background-color": "#000000",
-                "background-images": [
-                    {
-                        "src": "projects\/prueba\/backgrounds\/Gemini_Generated_Image_dbrx2bdbrx2bdbrx.png",
-                        "position": "center",
-                        "fill": "cover",
-                        "opacity": 1,
-                        "name": "pruebafondo"
-                    },
-                    {
-                        "name": "fondo1",
-                        "src": "projects\/prueba\/backgrounds\/Gemini_Generated_Image_7o2yse7o2yse7o2y_1.png",
-                        "position": "center",
-                        "fill": "cover",
-                        "opacity": 1
-                    }
-                ],
                 "content": {
                     "heading": "",
                     "text": "",
                     "layout": "center"
                 },
-                "sprites": [
-                    null,
-                    {
-                        "src": "sprites\/personaje1.png",
-                        "size": "10%",
-                        "positions": {
-                            "1": {
-                                "x": "50%",
-                                "y": "50%"
-                            }
-                        }
-                    },
-                    null,
-                    {
-                        "src": "sprites\/personaje1.png",
-                        "size": "10%",
-                        "positions": {
-                            "1": {
-                                "x": "50%",
-                                "y": "50%"
-                            }
-                        }
-                    }
-                ],
+                "sprites": [],
                 "actions": [],
-                "time_events": []
+                "background-images": {
+                    "1": {
+                        "name": "fondo 1",
+                        "src": "projects\/prueba\/backgrounds\/Gemini_Generated_Image_7o2yse7o2yse7o2y_3.png",
+                        "position": "center",
+                        "fill": "cover",
+                        "opacity": 1
+                    }
+                }
             }
         }
     },
@@ -73,7 +42,33 @@
         "defaultTransitionDuration": 800
     },
     "assets": {
-        "backgrounds": [],
+        "backgrounds": [
+            {
+                "name": "Gemini_Generated_Image_7o2yse7o2yse7o2y.png",
+                "path": "projects\/prueba\/backgrounds\/Gemini_Generated_Image_7o2yse7o2yse7o2y.png",
+                "size": 1473228
+            },
+            {
+                "name": "Gemini_Generated_Image_7o2yse7o2yse7o2y_1.png",
+                "path": "projects\/prueba\/backgrounds\/Gemini_Generated_Image_7o2yse7o2yse7o2y_1.png",
+                "size": 1473228
+            },
+            {
+                "name": "Gemini_Generated_Image_7o2yse7o2yse7o2y_2.png",
+                "path": "projects\/prueba\/backgrounds\/Gemini_Generated_Image_7o2yse7o2yse7o2y_2.png",
+                "size": 1473228
+            },
+            {
+                "name": "Gemini_Generated_Image_7o2yse7o2yse7o2y_3.png",
+                "path": "projects\/prueba\/backgrounds\/Gemini_Generated_Image_7o2yse7o2yse7o2y_3.png",
+                "size": 1473228
+            },
+            {
+                "name": "Gemini_Generated_Image_dbrx2bdbrx2bdbrx.png",
+                "path": "projects\/prueba\/backgrounds\/Gemini_Generated_Image_dbrx2bdbrx2bdbrx.png",
+                "size": 1531462
+            }
+        ],
         "sprites": [],
         "audio": []
     }

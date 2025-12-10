@@ -1,0 +1,43 @@
+{
+  "scene_collection": {
+    "title": "Demo ProyectoEnye",
+    "start_scene": 1,
+    "scenes": {
+      "1": {
+        "id": 1,
+        "title": "Escena de Ejemplo",
+        "background-color": "#123456",
+        "content": {
+          "heading": "Demo",
+          "text": "Esta es una escena de ejemplo creada por Copilot.",
+          "layout": "center"
+        },
+        "sprites": {},
+        "actions": [],
+        "background-images": {
+          "1": {
+            "name": "Fondo Demo",
+            "src": "backgrounds/scene1/demo.jpg", // Cambia por una imagen válida si lo necesitas
+            "position": "center",
+            "fill": "cover",
+            "opacity": 1,
+            "behaviors": [
+              {
+                "id": "b_demo1",
+                "type": "slide",
+                "config": {
+                  "startPosition": {"x": "-100%", "y": "0%"},
+                  "endPosition": {"x": "0%", "y": "0%"},
+                  "duration": 2
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "settings": {
+    "defaultTransitionDuration": 800
+  }
+}

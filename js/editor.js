@@ -154,7 +154,37 @@ $(document).ready(async function() {
         const easing = effect.easing || 'ease';
         const loop = effect.loop || false;
         
-        // CSS para la animación
+        // Añadir clase para el tipo de efecto
+        $element.addClass(`effect-${effect.type}`);
+        
+        // Manejar Loop Infinito
+        if (effect.type === 'loop') {
+            const direction = effect.direction || 'left';
+            const loopDuration = effect.duration || 30;
+            const distance = effect.distance || 'medium';
+            
+            // Configurar background-repeat para loop
+            $element.css('background-repeat', 'repeat');
+            
+            // Aplicar animación según dirección
+            $element.css({
+                'animation-name': `bg-loop-${direction}`,
+                'animation-duration': `${loopDuration}s`,
+                'animation-timing-function': 'linear',
+                'animation-iteration-count': 'infinite'
+            });
+            
+            return; // Salir, no aplicar animaciones genéricas
+        }
+        
+        // Para parallax, añadir atributos especiales
+        if (effect.type === 'parallax') {
+            $element.attr('data-parallax-speed', effect.speed || 0.5);
+            $element.attr('data-parallax-direction', effect.direction || 'vertical');
+            return; // Parallax se maneja con JS, no CSS animations
+        }
+        
+        // CSS para animaciones estándar (fade, slide, zoom)
         const animationName = `bg-effect-${effect.type}`;
         $element.css({
             'animation-name': animationName,
@@ -164,14 +194,47 @@ $(document).ready(async function() {
             'animation-iteration-count': loop ? 'infinite' : '1',
             'animation-fill-mode': 'forwards'
         });
+    }
+    
+    // Habilitar preview de parallax con movimiento del mouse
+    function enableParallaxPreview($stage) {
+        // Remover listener previo si existe
+        $stage.off('mousemove.parallax');
         
-        // Añadir clase para el tipo de efecto
-        $element.addClass(`effect-${effect.type}`);
-        
-        // Para parallax, añadir atributo especial
-        if (effect.type === 'parallax') {
-            $element.attr('data-parallax-speed', effect.parallaxSpeed || 0.5);
-        }
+        // Añadir nuevo listener
+        $stage.on('mousemove.parallax', function(e) {
+            const stageWidth = $stage.width();
+            const stageHeight = $stage.height();
+            const mouseX = e.pageX - $stage.offset().left;
+            const mouseY = e.pageY - $stage.offset().top;
+            
+            // Normalizar posición del mouse (-1 a 1)
+            const normalizedX = (mouseX / stageWidth) * 2 - 1;
+            const normalizedY = (mouseY / stageHeight) * 2 - 1;
+            
+            // Aplicar parallax a capas con efecto parallax
+            $('.background-layer[data-parallax-speed]').each(function() {
+                const $layer = $(this);
+                const speed = parseFloat($layer.attr('data-parallax-speed')) || 0.5;
+                const direction = $layer.attr('data-parallax-direction') || 'vertical';
+                
+                let offsetX = 0;
+                let offsetY = 0;
+                
+                // Calcular offset según dirección
+                if (direction === 'horizontal') {
+                    offsetX = normalizedX * 50 * speed;
+                } else if (direction === 'vertical') {
+                    offsetY = normalizedY * 50 * speed;
+                } else if (direction === 'both') {
+                    offsetX = normalizedX * 50 * speed;
+                    offsetY = normalizedY * 50 * speed;
+                }
+                
+                // Aplicar transformación
+                $layer.css('transform', `translate(${offsetX}px, ${offsetY}px)`);
+            });
+        });
     }
 
     function renderStage(scene) {
@@ -197,27 +260,36 @@ $(document).ready(async function() {
                     $bg.css('opacity', bg.opacity);
                 }
                 
-                // Modo de relleno
-                const fillMode = bg.fill || 'cover';
-                if (fillMode === 'stretch') {
+                // Tamaño del fondo
+                const sizeMode = bg.size || bg.fill || 'cover'; // Compatibilidad con fill antiguo
+                if (sizeMode === 'stretch') {
                     $bg.css('background-size', '100% 100%');
-                } else if (fillMode === 'repeat') {
-                    $bg.css('background-repeat', 'repeat');
-                    $bg.css('background-size', 'auto');
-                } else if (fillMode === 'no-repeat') {
-                    $bg.css('background-repeat', 'no-repeat');
+                } else if (sizeMode === 'auto') {
                     $bg.css('background-size', 'auto');
                 } else {
-                    $bg.css('background-size', fillMode); // cover o contain
+                    $bg.css('background-size', sizeMode); // cover o contain
                 }
+                
+                // Repetición del fondo
+                const repeatMode = bg.repeat || 'no-repeat';
+                $bg.css('background-repeat', repeatMode);
                 
                 // Aplicar efectos/animaciones
                 if (bg.effect && bg.effect.type !== 'none') {
                     applyBackgroundEffect($bg, bg.effect);
                 }
                 
+                // --- Dependencias de animación ---
+                if (bg.dependency) {
+                    $bg.attr('data-dependency', bg.dependency);
+                    $bg.attr('data-dependency-type', bg.dependencyType || 'onstart');
+                }
+                
                 $stage.append($bg);
             });
+            
+            // Activar preview de parallax con movimiento del mouse
+            enableParallaxPreview($stage);
         }
 
         // Sprites
@@ -289,6 +361,49 @@ $(document).ready(async function() {
         }
 
         renderContentOverlay();
+        
+        // --- Sincronización de animaciones entre capas ---
+        function syncBackgroundDependencies() {
+            const $layers = $('.background-layer');
+            $layers.each(function() {
+                const $layer = $(this);
+                const dep = $layer.attr('data-dependency');
+                const depType = $layer.attr('data-dependency-type');
+                if (dep) {
+                    const $depLayer = $(`.background-layer[data-bg-id='${dep}']`);
+                    if ($depLayer.length) {
+                        // Escuchar animación de la capa dependiente
+                        if (depType === 'onstart') {
+                            $depLayer.on('animationstart', function handler() {
+                                $layer[0].style.animationPlayState = '';
+                                $depLayer.off('animationstart', handler);
+                            });
+                            $layer[0].style.animationPlayState = 'paused';
+                        } else if (depType === 'onend') {
+                            $depLayer.on('animationend', function handler() {
+                                $layer[0].style.animationPlayState = '';
+                                $depLayer.off('animationend', handler);
+                            });
+                            $layer[0].style.animationPlayState = 'paused';
+                        } else if (depType === 'sync') {
+                            // Sincronizar movimiento: igualar tiempo y playstate
+                            const syncAnim = () => {
+                                $layer[0].style.animationDuration = getComputedStyle($depLayer[0]).animationDuration;
+                                $layer[0].style.animationPlayState = getComputedStyle($depLayer[0]).animationPlayState;
+                            };
+                            syncAnim();
+                            $depLayer.on('animationstart animationend', syncAnim);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Llamar después de renderizar stage
+        $(document).on('renderStageDone', syncBackgroundDependencies);
+        
+        // Lanzar evento para sincronización de dependencias
+        $(document).trigger('renderStageDone');
     }
 
     function renderContentOverlay() {
@@ -486,7 +601,8 @@ $(document).ready(async function() {
         // Propiedades básicas
         $('#background-name').val(bg.name || '');
         $('#background-src').val(bg.src || '');
-        $('#bg-fill').val(bg.fill || 'cover');
+        $('#bg-size').val(bg.size || bg.fill || 'cover'); // Compatibilidad con fill antiguo
+        $('#bg-repeat').val(bg.repeat || 'no-repeat');
         
         // Determinar tipo de efecto
         const effect = bg.effect || {};
@@ -498,6 +614,40 @@ $(document).ready(async function() {
         
         // Mostrar/ocultar paneles
         toggleEffectOptions();
+
+        // --- Dependencia de capa ---
+        // Rellenar selector de dependencias
+        const $depSelect = $('#bg-dependency');
+        $depSelect.empty();
+        const fondos = Object.entries(scene['background-images']).filter(([depKey, depBg]) => depBg && depKey != key);
+        $depSelect.append('<option value="">Sin dependencia</option>');
+        if (fondos.length > 0) {
+            fondos.forEach(([depKey, depBg]) => {
+                const name = depBg.name || (depBg.src ? depBg.src.split('/').pop() : 'Fondo ' + depKey);
+                $depSelect.append(`<option value="${depKey}">${name}</option>`);
+            });
+        }
+        // Seleccionar si ya hay dependencia
+        $depSelect.val(bg.dependency || '');
+        // Mostrar tipo de dependencia si aplica
+        if (bg.dependency) {
+            $('#bg-dependency-type-container').show();
+            $('#bg-dependency-type').val(bg.dependencyType || 'onstart');
+        } else {
+            $('#bg-dependency-type-container').hide();
+        }
+
+        // Mostrar/ocultar tipo según selección
+        $depSelect.off('change').on('change', function() {
+            if ($(this).val()) {
+                $('#bg-dependency-type-container').show();
+            } else {
+                $('#bg-dependency-type-container').hide();
+            }
+        });
+        
+        // Disparar evento de selección de fondo
+        $(document).trigger('backgroundSelected', [bg]);
     }
     
     function loadEffectOptions(type, effect) {
@@ -542,6 +692,12 @@ $(document).ready(async function() {
                 $('#zoom-easing').val(effect.easing || 'ease');
                 break;
                 
+            case 'loop':
+                $('#loop-direction').val(effect.direction || 'left');
+                $('#loop-duration').val(effect.duration || 30);
+                $('#loop-distance').val(effect.distance || 'medium');
+                break;
+                
             case 'parallax':
                 $('#parallax-speed').val(effect.speed || 0.5);
                 $('#parallax-speed-value').text((effect.speed || 0.5) + 'x');
@@ -573,6 +729,9 @@ $(document).ready(async function() {
             case 'zoom-out':
                 $('#zoom-options').show();
                 break;
+            case 'loop':
+                $('#loop-options').show();
+                break;
             case 'parallax':
                 $('#parallax-options').show();
                 break;
@@ -580,31 +739,346 @@ $(document).ready(async function() {
     }
     
     // Event listeners para cambio de tipo
-    $('#bg-effect-type').change(toggleEffectOptions);
+    $('#bg-effect-type').change(function() {
+        toggleEffectOptions();
+        
+        // Si se cambia a loop, aplicar preview inmediatamente
+        if ($(this).val() === 'loop') {
+            setTimeout(applyLoopPreview, 100);
+        }
+    });
     
-    // Event listeners para sliders con valores dinámicos
+    // Event listeners para sliders con valores dinámicos y preview en tiempo real
     $('#static-opacity').on('input', function() {
-        $('#static-opacity-value').text(Math.round($(this).val() * 100) + '%');
+        const opacity = $(this).val();
+        $('#static-opacity-value').text(Math.round(opacity * 100) + '%');
+        
+        // Preview en tiempo real
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            $bgLayer.css('opacity', opacity);
+        }
+    });
+    
+    // Preview en tiempo real para posición estática
+    $('#static-pos-x, #static-pos-y').on('change', function() {
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const posX = $('#static-pos-x').val() || 'center';
+            const posY = $('#static-pos-y').val() || 'center';
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            $bgLayer.css('background-position', `${posX} ${posY}`);
+            showInfo('Posición actualizada: ' + posX + ' ' + posY);
+        }
     });
     
     $('#fade-opacity-start').on('input', function() {
-        $('#fade-opacity-start-value').text(Math.round($(this).val() * 100) + '%');
+        const opacity = $(this).val();
+        $('#fade-opacity-start-value').text(Math.round(opacity * 100) + '%');
+        
+        // Preview: mostrar opacidad inicial
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            $bgLayer.css('opacity', opacity);
+            showInfo('Vista previa: Opacidad inicial ' + Math.round(opacity * 100) + '%');
+        }
     });
     
     $('#fade-opacity-end').on('input', function() {
-        $('#fade-opacity-end-value').text(Math.round($(this).val() * 100) + '%');
+        const opacity = $(this).val();
+        $('#fade-opacity-end-value').text(Math.round(opacity * 100) + '%');
+        
+        // Preview: mostrar opacidad final
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            $bgLayer.css('opacity', opacity);
+            showInfo('Vista previa: Opacidad final ' + Math.round(opacity * 100) + '%');
+        }
     });
     
     $('#zoom-scale-start').on('input', function() {
-        $('#zoom-scale-start-value').text($(this).val() + 'x');
+        const scale = $(this).val();
+        $('#zoom-scale-start-value').text(scale + 'x');
+        
+        // Preview: mostrar escala inicial
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            const origin = $('#zoom-origin').val() || 'center';
+            $bgLayer.css({
+                'transform': `scale(${scale})`,
+                'transform-origin': origin
+            });
+            showInfo('Vista previa: Escala inicial ' + scale + 'x');
+        }
     });
     
     $('#zoom-scale-end').on('input', function() {
-        $('#zoom-scale-end-value').text($(this).val() + 'x');
+        const scale = $(this).val();
+        $('#zoom-scale-end-value').text(scale + 'x');
+        
+        // Preview: mostrar escala final
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            const origin = $('#zoom-origin').val() || 'center';
+            $bgLayer.css({
+                'transform': `scale(${scale})`,
+                'transform-origin': origin
+            });
+            showInfo('Vista previa: Escala final ' + scale + 'x');
+        }
+    });
+    
+    // Preview cuando cambia el punto de origen del zoom
+    $('#zoom-origin').on('change', function() {
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const origin = $(this).val();
+            const scale = $('#zoom-scale-end').val() || 1;
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            $bgLayer.css({
+                'transform': `scale(${scale})`,
+                'transform-origin': origin
+            });
+            showInfo('Punto de origen: ' + origin);
+        }
+    });
+    
+    // Sistema de picking de posiciones para Slide
+    let pickingPosition = null; // 'start' o 'end'
+    let positionMarker = null;
+    
+    function startPickingPosition(type) {
+        pickingPosition = type;
+        const $stage = $('#stage-container');
+        
+        // Cambiar cursor
+        $stage.css('cursor', 'crosshair');
+        
+        // Mostrar overlay de ayuda
+        if (!positionMarker) {
+            positionMarker = $('<div id="position-marker"></div>').css({
+                position: 'absolute',
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                border: '3px solid #007bff',
+                background: 'rgba(0, 123, 255, 0.3)',
+                pointerEvents: 'none',
+                display: 'none',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 9999
+            });
+            $stage.append(positionMarker);
+        }
+        
+        showInfo(`Click en el stage para posición ${type === 'start' ? 'inicial' : 'final'}`);
+    }
+    
+    // Mover marcador con el mouse
+    $('#stage-container').on('mousemove.positionPicker', function(e) {
+        if (!pickingPosition || !positionMarker) return;
+        
+        const offset = $(this).offset();
+        const x = e.pageX - offset.left;
+        const y = e.pageY - offset.top;
+        
+        positionMarker.css({
+            display: 'block',
+            left: x + 'px',
+            top: y + 'px'
+        });
+    });
+    
+    // Click para seleccionar posición
+    $('#stage-container').on('click.positionPicker', function(e) {
+        if (!pickingPosition) return;
+        
+        e.stopPropagation();
+        
+        const $stage = $(this);
+        const stageWidth = $stage.width();
+        const stageHeight = $stage.height();
+        const offset = $stage.offset();
+        const clickX = e.pageX - offset.left;
+        const clickY = e.pageY - offset.top;
+        
+        // Convertir a porcentaje relativo al centro
+        const percentX = ((clickX / stageWidth) * 100).toFixed(1) + '%';
+        const percentY = ((clickY / stageHeight) * 100).toFixed(1) + '%';
+        
+        // Actualizar campos
+        if (pickingPosition === 'start') {
+            $('#slide-start-x').val(percentX);
+            $('#slide-start-y').val(percentY);
+        } else {
+            $('#slide-end-x').val(percentX);
+            $('#slide-end-y').val(percentY);
+        }
+        
+        // Aplicar preview del slide completo
+        applySlidePreview();
+        
+        // Limpiar
+        pickingPosition = null;
+        $stage.css('cursor', '');
+        if (positionMarker) positionMarker.hide();
+        
+        showSuccess(`Posición guardada: ${percentX}, ${percentY}`);
+    });
+    
+    // Botones para iniciar picking
+    $('#btn-pick-start-position').click(function() {
+        startPickingPosition('start');
+    });
+    
+    $('#btn-pick-end-position').click(function() {
+        startPickingPosition('end');
+    });
+    
+    // Función para aplicar preview de slide
+    function applySlidePreview() {
+        if (selectedBackgroundId === null && selectedBackgroundId !== 0) return;
+        
+        const startX = $('#slide-start-x').val() || '-100%';
+        const startY = $('#slide-start-y').val() || '50%';
+        const endX = $('#slide-end-x').val() || '0%';
+        const endY = $('#slide-end-y').val() || '0%';
+        const duration = $('#slide-duration').val() || 1;
+        
+        const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+        
+        // Limpiar animaciones previas
+        $bgLayer.css({
+            'animation': 'none',
+            'background-position': `${startX} ${startY}`
+        });
+        
+        // Forzar reflow
+        void $bgLayer[0].offsetWidth;
+        
+        // Crear keyframes dinámicos
+        const animationName = 'slide-preview-' + selectedBackgroundId;
+        const keyframes = `
+            @keyframes ${animationName} {
+                from { background-position: ${startX} ${startY}; }
+                to { background-position: ${endX} ${endY}; }
+            }
+        `;
+        
+        // Eliminar estilo previo si existe
+        $('#slide-preview-style').remove();
+        
+        // Añadir nuevo estilo
+        $('<style id="slide-preview-style">' + keyframes + '</style>').appendTo('head');
+        
+        // Aplicar animación
+        $bgLayer.css({
+            'animation': `${animationName} ${duration}s ease forwards`
+        });
+    }
+    
+    // Botones de presets
+    $('.preset-btn').click(function() {
+        const type = $(this).data('pos');
+        const x = $(this).data('x');
+        const y = $(this).data('y');
+        
+        if (type === 'start') {
+            $('#slide-start-x').val(x);
+            $('#slide-start-y').val(y);
+        } else {
+            $('#slide-end-x').val(x);
+            $('#slide-end-y').val(y);
+        }
+        
+        // Aplicar preview del slide completo
+        applySlidePreview();
+        showInfo(`Preset aplicado: ${x}, ${y}`);
     });
     
     $('#parallax-speed').on('input', function() {
-        $('#parallax-speed-value').text($(this).val() + 'x');
+        const speed = $(this).val();
+        $('#parallax-speed-value').text(speed + 'x');
+        
+        // Preview: simular movimiento parallax
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            const direction = $('#parallax-direction').val() || 'vertical';
+            
+            // Guardar velocidad como atributo
+            $bgLayer.attr('data-parallax-speed', speed);
+            $bgLayer.attr('data-parallax-direction', direction);
+            
+            showInfo('Parallax configurado: ' + speed + 'x (' + direction + ')');
+        }
+    });
+    
+    // Preview para dirección de parallax
+    $('#parallax-direction').on('change', function() {
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const direction = $(this).val();
+            $bgLayer.attr('data-parallax-speed', speed);
+            $bgLayer.attr('data-parallax-direction', direction);
+            
+            showInfo('Dirección parallax: ' + direction);
+        }
+    });
+    
+    // Preview en tiempo real para Loop Infinito
+    function applyLoopPreview() {
+        if (selectedBackgroundId === null && selectedBackgroundId !== 0) return;
+        
+        const direction = $('#loop-direction').val() || 'left';
+        const duration = $('#loop-duration').val() || 30;
+        const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+        
+        // Asegurar que el fondo se repite
+        $bgLayer.css('background-repeat', 'repeat');
+        
+        // Aplicar animación
+        $bgLayer.css({
+            'animation-name': `bg-loop-${direction}`,
+            'animation-duration': `${duration}s`,
+            'animation-timing-function': 'linear',
+            'animation-iteration-count': 'infinite'
+        });
+        
+        showInfo(`Loop: ${duration}s hacia ${direction}`);
+    }
+    
+    $('#loop-direction').on('change', applyLoopPreview);
+    $('#loop-duration').on('change', applyLoopPreview);
+    
+    // Preview en tiempo real para slide cuando cambian los parámetros
+    $('#slide-duration, #slide-easing').on('change', applySlidePreview);
+    
+    // Preview en tiempo real del tamaño del fondo
+    $('#bg-size').on('change', function() {
+        if (selectedBackgroundId === null && selectedBackgroundId !== 0) return;
+        
+        const sizeMode = $(this).val();
+        const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+        
+        // Aplicar tamaño
+        if (sizeMode === 'stretch') {
+            $bgLayer.css('background-size', '100% 100%');
+        } else if (sizeMode === 'auto') {
+            $bgLayer.css('background-size', 'auto');
+        } else {
+            $bgLayer.css('background-size', sizeMode); // cover o contain
+        }
+        
+        showInfo('Tamaño: ' + sizeMode);
+    });
+    
+    // Preview en tiempo real de la repetición del fondo
+    $('#bg-repeat').on('change', function() {
+        if (selectedBackgroundId === null && selectedBackgroundId !== 0) return;
+        
+        const repeatMode = $(this).val();
+        const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+        
+        $bgLayer.css('background-repeat', repeatMode);
+        
+        showInfo('Repetición: ' + repeatMode);
     });
 
     $('#btn-upload-background').click(function() {
@@ -626,6 +1100,20 @@ $(document).ready(async function() {
         }
     });
 
+    // Botón para contraer/expandir propiedades del fondo
+    $('#btn-toggle-bg-properties').click(function() {
+        const $content = $('#bg-properties-content');
+        const $btn = $(this);
+        
+        if ($content.is(':visible')) {
+            $content.slideUp(200);
+            $btn.text('▶');
+        } else {
+            $content.slideDown(200);
+            $btn.text('▼');
+        }
+    });
+
     $('#btn-save-background').click(function() {
         if (selectedBackgroundId === null && selectedBackgroundId !== 0) return;
         
@@ -635,7 +1123,8 @@ $(document).ready(async function() {
         // Propiedades básicas
         bg.name = $('#background-name').val();
         bg.src = $('#background-src').val();
-        bg.fill = $('#bg-fill').val() || 'cover';
+        bg.size = $('#bg-size').val() || 'cover';
+        bg.repeat = $('#bg-repeat').val() || 'no-repeat';
         
         // Recopilar efecto según el tipo seleccionado
         const effectType = $('#bg-effect-type').val();
@@ -694,6 +1183,15 @@ $(document).ready(async function() {
                 };
                 break;
                 
+            case 'loop':
+                bg.effect = {
+                    type: 'loop',
+                    direction: $('#loop-direction').val() || 'left',
+                    duration: parseFloat($('#loop-duration').val()) || 30,
+                    distance: $('#loop-distance').val() || 'medium'
+                };
+                break;
+                
             case 'parallax':
                 bg.effect = {
                     type: 'parallax',
@@ -702,6 +1200,10 @@ $(document).ready(async function() {
                 };
                 break;
         }
+        
+        // Guardar dependencia
+        bg.dependency = $('#bg-dependency').val() || '';
+        bg.dependencyType = $('#bg-dependency-type').val() || 'onstart';
         
         showSuccess('Fondo actualizado con configuración ' + effectType);
         refreshBackgroundList();
@@ -1196,4 +1698,267 @@ $(document).ready(async function() {
         }
     }
 
-});
+    // --- Comportamientos de fondo ---
+    function generateBehaviorId() {
+        return 'b' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function addBackgroundBehavior(bg, type, config) {
+        if (!bg.behaviors) bg.behaviors = [];
+        const behavior = {
+            id: generateBehaviorId(),
+            type: type,
+            config: config || {}
+        };
+        bg.behaviors.push(behavior);
+        return behavior;
+    }
+
+    function renderBackgroundBehaviors(bg) {
+        // Eliminado: lógica de comportamientos de fondo
+        // Si necesitas renderizar algo aquí, déjalo vacío o solo el drag & drop de fondos
+    }
+
+    // Mostrar panel de configuración justo debajo del comportamiento seleccionado
+    function showBehaviorConfigPanel(bg, behaviorId) {
+        // Eliminado: panel de configuración de comportamientos de fondo
+        // Esta función queda vacía
+    }
+
+    // Conectar botón de añadir comportamiento
+    $('#btn-add-behavior').click(function() {
+        // Eliminado: botón de añadir comportamiento de fondo
+        // No hace nada
+    });
+
+    // Renderizar comportamientos al seleccionar fondo
+    $(document).on('backgroundSelected', function(e, bg) {
+        renderBackgroundBehaviors(bg);
+        $('.behavior-config-panel').remove();
+    });
+
+    // Modificar selectBackground para disparar evento
+    function selectBackground(key) {
+        selectedBackgroundId = key;
+        $('#background-properties').show();
+        $('#sprite-properties').hide();
+        $('#action-properties').hide();
+
+        const scene = gameData.scene_collection.scenes[currentSceneId];
+        const bg = scene['background-images'][key];
+        
+        // Propiedades básicas
+        $('#background-name').val(bg.name || '');
+        $('#background-src').val(bg.src || '');
+        $('#bg-size').val(bg.size || bg.fill || 'cover'); // Compatibilidad con fill antiguo
+        $('#bg-repeat').val(bg.repeat || 'no-repeat');
+        
+        // Determinar tipo de efecto
+        const effect = bg.effect || {};
+        const effectType = effect.type || 'static';
+        $('#bg-effect-type').val(effectType);
+        
+        // Cargar opciones específicas según el tipo
+        loadEffectOptions(effectType, effect);
+        
+        // Mostrar/ocultar paneles
+        toggleEffectOptions();
+
+        // --- Dependencia de capa ---
+        // Rellenar selector de dependencias
+        const $depSelect = $('#bg-dependency');
+        $depSelect.empty();
+        $depSelect.append('<option value="">Sin dependencia</option>');
+        $.each(scene['background-images'], function(depKey, depBg) {
+            if (!depBg) return;
+            if (depKey != key) {
+                const name = depBg.name || (depBg.src ? depBg.src.split('/').pop() : 'Fondo ' + depKey);
+                $depSelect.append(`<option value="${depKey}">${name}</option>`);
+            }
+        });
+        // Seleccionar si ya hay dependencia
+        $depSelect.val(bg.dependency || '');
+        // Mostrar tipo de dependencia si aplica
+        if (bg.dependency) {
+            $('#bg-dependency-type-container').show();
+            $('#bg-dependency-type').val(bg.dependencyType || 'onstart');
+        } else {
+            $('#bg-dependency-type-container').hide();
+        }
+
+        // Mostrar/ocultar tipo según selección
+        $depSelect.off('change').on('change', function() {
+            if ($(this).val()) {
+                $('#bg-dependency-type-container').show();
+            } else {
+                $('#bg-dependency-type-container').hide();
+            }
+        });
+        
+        // Disparar evento de selección de fondo
+        $(document).trigger('backgroundSelected', [bg]);
+    }
+    
+    function loadEffectOptions(type, effect) {
+        switch(type) {
+            case 'static':
+                $('#static-pos-x').val(effect.position?.x || 'center');
+                $('#static-pos-y').val(effect.position?.y || 'center');
+                $('#static-opacity').val(effect.opacity || 1);
+                $('#static-opacity-value').text(Math.round((effect.opacity || 1) * 100) + '%');
+                break;
+                
+            case 'fade-in':
+            case 'fade-out':
+                $('#fade-opacity-start').val(effect.opacityStart || 0);
+                $('#fade-opacity-start-value').text(Math.round((effect.opacityStart || 0) * 100) + '%');
+                $('#fade-opacity-end').val(effect.opacityEnd || 1);
+                $('#fade-opacity-end-value').text(Math.round((effect.opacityEnd || 1) * 100) + '%');
+                $('#fade-duration').val(effect.duration || 1);
+                $('#fade-delay').val(effect.delay || 0);
+                $('#fade-easing').val(effect.easing || 'ease');
+                break;
+                
+            case 'slide':
+                $('#slide-start-x').val(effect.startPosition?.x || '-100%');
+                $('#slide-start-y').val(effect.startPosition?.y || '0%');
+                $('#slide-end-x').val(effect.endPosition?.x || '0%');
+                $('#slide-end-y').val(effect.endPosition?.y || '0%');
+                $('#slide-duration').val(effect.duration || 1);
+                $('#slide-delay').val(effect.delay || 0);
+                $('#slide-easing').val(effect.easing || 'ease');
+                break;
+                
+            case 'zoom-in':
+            case 'zoom-out':
+                $('#zoom-scale-start').val(effect.scaleStart || 0);
+                $('#zoom-scale-start-value').text((effect.scaleStart || 0) + 'x');
+                $('#zoom-scale-end').val(effect.scaleEnd || 1);
+                $('#zoom-scale-end-value').text((effect.scaleEnd || 1) + 'x');
+                $('#zoom-origin').val(effect.origin || 'center');
+                $('#zoom-duration').val(effect.duration || 1);
+                $('#zoom-delay').val(effect.delay || 0);
+                $('#zoom-easing').val(effect.easing || 'ease');
+                break;
+                
+            case 'loop':
+                $('#loop-direction').val(effect.direction || 'left');
+                $('#loop-duration').val(effect.duration || 30);
+                $('#loop-distance').val(effect.distance || 'medium');
+                break;
+                
+            case 'parallax':
+                $('#parallax-speed').val(effect.speed || 0.5);
+                $('#parallax-speed-value').text((effect.speed || 0.5) + 'x');
+                $('#parallax-direction').val(effect.direction || 'vertical');
+                break;
+        }
+    }
+    
+    // Mostrar/ocultar opciones según el tipo de efecto
+    function toggleEffectOptions() {
+        const effectType = $('#bg-effect-type').val();
+        
+        // Ocultar todas las opciones primero
+        $('.effect-options').hide();
+        
+        // Mostrar solo la sección relevante
+        switch(effectType) {
+            case 'static':
+                $('#static-options').show();
+                break;
+            case 'fade-in':
+            case 'fade-out':
+                $('#fade-options').show();
+                break;
+            case 'slide':
+                $('#slide-options').show();
+                break;
+            case 'zoom-in':
+            case 'zoom-out':
+                $('#zoom-options').show();
+                break;
+            case 'loop':
+                $('#loop-options').show();
+                break;
+            case 'parallax':
+                $('#parallax-options').show();
+                break;
+        }
+    }
+    
+    // Event listeners para cambio de tipo
+    $('#bg-effect-type').change(function() {
+        toggleEffectOptions();
+        
+        // Si se cambia a loop, aplicar preview inmediatamente
+        if ($(this).val() === 'loop') {
+            setTimeout(applyLoopPreview, 100);
+        }
+    });
+    
+    // Event listeners para sliders con valores dinámicos y preview en tiempo real
+    $('#static-opacity').on('input', function() {
+        const opacity = $(this).val();
+        $('#static-opacity-value').text(Math.round(opacity * 100) + '%');
+        
+        // Preview en tiempo real
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            $bgLayer.css('opacity', opacity);
+        }
+    });
+    
+    // Preview en tiempo real para posición estática
+    $('#static-pos-x, #static-pos-y').on('change', function() {
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const posX = $('#static-pos-x').val() || 'center';
+            const posY = $('#static-pos-y').val() || 'center';
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            $bgLayer.css('background-position', `${posX} ${posY}`);
+            showInfo('Posición actualizada: ' + posX + ' ' + posY);
+        }
+    });
+    
+    $('#fade-opacity-start').on('input', function() {
+        const opacity = $(this).val();
+        $('#fade-opacity-start-value').text(Math.round(opacity * 100) + '%');
+        
+        // Preview: mostrar opacidad inicial
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            $bgLayer.css('opacity', opacity);
+            showInfo('Vista previa: Opacidad inicial ' + Math.round(opacity * 100) + '%');
+        }
+    });
+    
+    $('#fade-opacity-end').on('input', function() {
+        const opacity = $(this).val();
+        $('#fade-opacity-end-value').text(Math.round(opacity * 100) + '%');
+        
+        // Preview: mostrar opacidad final
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            $bgLayer.css('opacity', opacity);
+            showInfo('Vista previa: Opacidad final ' + Math.round(opacity * 100) + '%');
+        }
+    });
+    
+    $('#zoom-scale-start').on('input', function() {
+        const scale = $(this).val();
+        $('#zoom-scale-start-value').text(scale + 'x');
+        
+        // Preview: mostrar escala inicial
+        if (selectedBackgroundId !== null || selectedBackgroundId === 0) {
+            const $bgLayer = $(`.background-layer[data-bg-id="${selectedBackgroundId}"]`);
+            const origin = $('#zoom-origin').val() || 'center';
+            $bgLayer.css({
+                'transform': `scale(${scale})`,
+                'transform-origin': origin
+            });
+        }
+    });
+
+    // ...puedes agregar más listeners aquí...
+
+}); // Fin de $(document).ready

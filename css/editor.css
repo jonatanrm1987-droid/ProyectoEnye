@@ -638,6 +638,33 @@ button.danger {
     }
 }
 
+/* Loop Infinito - Movimiento continuo */
+@keyframes bg-loop-left {
+    0% { background-position: 0% center; }
+    100% { background-position: -200% center; }
+}
+
+@keyframes bg-loop-right {
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
+}
+
+@keyframes bg-loop-up {
+    0% { background-position: center 0%; }
+    100% { background-position: center -200%; }
+}
+
+@keyframes bg-loop-down {
+    0% { background-position: center 0%; }
+    100% { background-position: center 200%; }
+}
+
+.effect-loop {
+    animation-iteration-count: infinite !important;
+    animation-timing-function: linear !important;
+    background-repeat: repeat !important;
+}
+
 /* Parallax - Se maneja con JavaScript durante scroll/movimiento */
 .effect-parallax {
     will-change: transform;

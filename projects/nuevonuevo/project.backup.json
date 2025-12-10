@@ -1,0 +1,64 @@
+{
+    "metadata": {
+        "id": "proj_1765363743_e287ef60",
+        "slug": "nuevonuevo",
+        "createdAt": "2025-12-10T11:49:03+01:00",
+        "modifiedAt": "2025-12-10T17:29:53+01:00"
+    },
+    "scene_collection": {
+        "title": "nuevonuevo",
+        "author": "",
+        "created": "2025-12-10",
+        "start_scene": "scene1",
+        "scenes": {
+            "scene1": {
+                "id": "scene1",
+                "title": "Escena Inicial",
+                "background-color": "#000000",
+                "background-images": [
+                    null,
+                    {
+                        "name": "fondoprimero",
+                        "src": "projects\/nuevonuevo\/backgrounds\/Gemini_Generated_Image_7o2yse7o2yse7o2y.png",
+                        "position": "center",
+                        "fill": "cover",
+                        "opacity": 1,
+                        "behaviors": [
+                            null,
+                            {
+                                "id": "b4d482fab7",
+                                "type": "slide",
+                                "config": []
+                            }
+                        ],
+                        "_tempBehavior": {
+                            "id": "b6ard1uvql",
+                            "type": "slide",
+                            "config": []
+                        }
+                    }
+                ],
+                "content": {
+                    "heading": "",
+                    "text": "",
+                    "layout": "center"
+                },
+                "sprites": [],
+                "actions": [],
+                "time_events": []
+            }
+        }
+    },
+    "settings": {
+        "screen": {
+            "width": 1920,
+            "height": 1080
+        },
+        "defaultTransitionDuration": 800
+    },
+    "assets": {
+        "backgrounds": [],
+        "sprites": [],
+        "audio": []
+    }
+}
