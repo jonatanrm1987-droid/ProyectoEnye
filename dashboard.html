@@ -23,7 +23,10 @@
         
         <h3>Escenas</h3>
         <select id="scene-selector" size="5" style="height: 150px; margin-bottom: 10px;"></select>
-        <button id="btn-add-scene">Nueva Escena</button>
+        <div style="display: flex; gap: 5px;">
+            <button id="btn-add-scene" style="flex: 1;">Nueva Escena</button>
+            <button id="btn-delete-scene" class="danger" style="flex: 1;">Eliminar</button>
+        </div>
         
         <div id="scene-properties" class="control-group" style="display:none;">
             <label>ID Escena:</label>
@@ -32,14 +35,6 @@
             <input type="text" id="scene-title">
             <label>Color Fondo:</label>
             <input type="color" id="scene-bg-color">
-            <label>Texto Contenido:</label>
-            <textarea id="scene-text" rows="3"></textarea>
-            <label>Layout Texto:</label>
-            <select id="scene-layout">
-                <option value="center">Centro</option>
-                <option value="top">Arriba</option>
-                <option value="bottom">Abajo</option>
-            </select>
         </div>
 
         <div class="control-group">
@@ -62,6 +57,213 @@
     <!-- Right Sidebar: Sprites & Actions -->
     <div id="sidebar-right">
         
+        <!-- Backgrounds Section -->
+        <h3>Fondos de Escena</h3>
+        <div class="control-group">
+            <div id="background-list"></div>
+            <button id="btn-add-background" class="secondary" style="margin-top:5px; width: 100%;">+ Añadir Fondo</button>
+            <button id="btn-delete-background" class="danger" style="margin-top:5px; width: 100%;">- Eliminar Fondo</button>
+            <input type="file" id="background-file-input" accept="image/*" style="display: none;">
+        </div>
+
+        <div id="background-properties" class="control-group" style="display:none;">
+            <h4 style="margin-top: 0;">Propiedades del Fondo</h4>
+            
+            <label>Nombre:</label>
+            <input type="text" id="background-name" placeholder="Nombre del fondo">
+            
+            <label>Archivo:</label>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="background-src" placeholder="Ruta" readonly style="flex: 1;">
+                <button id="btn-upload-background" class="secondary" style="padding: 5px 10px;">📁</button>
+            </div>
+            <input type="file" id="background-update-input" accept="image/*" style="display: none;">
+            
+            <hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
+            
+            <h4>Visualización Base</h4>
+            <label>Modo de Relleno:</label>
+            <select id="bg-fill">
+                <option value="cover">Cubrir (cover)</option>
+                <option value="contain">Contener (contain)</option>
+                <option value="stretch">Estirar (stretch)</option>
+                <option value="repeat">Repetir (repeat)</option>
+                <option value="no-repeat">No Repetir</option>
+            </select>
+            
+            <hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
+            
+            <h4>Comportamiento / Animación</h4>
+            <label>Tipo:</label>
+            <select id="bg-effect-type">
+                <option value="static">Estático (sin animación)</option>
+                <option value="fade-in">Fade In (aparecer)</option>
+                <option value="fade-out">Fade Out (desaparecer)</option>
+                <option value="slide">Deslizar (custom)</option>
+                <option value="zoom-in">Zoom In</option>
+                <option value="zoom-out">Zoom Out</option>
+                <option value="parallax">Parallax (scroll)</option>
+            </select>
+            
+            <!-- Opciones para STATIC -->
+            <div id="static-options" class="effect-options" style="display: none; margin-top: 10px;">
+                <h5 style="margin: 10px 0 5px; color: #666;">Posición Fija</h5>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label>X:</label>
+                        <input type="text" id="static-pos-x" placeholder="center" title="center, left, right, 0px, 50%">
+                    </div>
+                    <div>
+                        <label>Y:</label>
+                        <input type="text" id="static-pos-y" placeholder="center" title="center, top, bottom, 0px, 50%">
+                    </div>
+                </div>
+                <label>Opacidad:</label>
+                <input type="range" id="static-opacity" min="0" max="1" step="0.1" value="1" style="width: 100%;">
+                <span id="static-opacity-value" style="font-size: 12px; color: #666;">100%</span>
+            </div>
+            
+            <!-- Opciones para FADE IN/OUT -->
+            <div id="fade-options" class="effect-options" style="display: none; margin-top: 10px;">
+                <h5 style="margin: 10px 0 5px; color: #666;">Configuración Fade</h5>
+                <label>Opacidad Inicial:</label>
+                <input type="range" id="fade-opacity-start" min="0" max="1" step="0.1" value="0" style="width: 100%;">
+                <span id="fade-opacity-start-value" style="font-size: 12px; color: #666;">0%</span>
+                
+                <label>Opacidad Final:</label>
+                <input type="range" id="fade-opacity-end" min="0" max="1" step="0.1" value="1" style="width: 100%;">
+                <span id="fade-opacity-end-value" style="font-size: 12px; color: #666;">100%</span>
+                
+                <label>Duración (segundos):</label>
+                <input type="number" id="fade-duration" min="0.1" max="10" step="0.1" value="1">
+                
+                <label>Retraso (segundos):</label>
+                <input type="number" id="fade-delay" min="0" max="10" step="0.1" value="0">
+                
+                <label>Easing:</label>
+                <select id="fade-easing">
+                    <option value="linear">Lineal</option>
+                    <option value="ease">Ease</option>
+                    <option value="ease-in">Ease In</option>
+                    <option value="ease-out">Ease Out</option>
+                    <option value="ease-in-out">Ease In-Out</option>
+                </select>
+            </div>
+            
+            <!-- Opciones para SLIDE -->
+            <div id="slide-options" class="effect-options" style="display: none; margin-top: 10px;">
+                <h5 style="margin: 10px 0 5px; color: #666;">Configuración Deslizamiento</h5>
+                <label>Posición Inicial:</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <label style="font-size: 11px;">X inicio:</label>
+                        <input type="text" id="slide-start-x" placeholder="-100%" title="Ej: -100%, 0px, 100vw">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px;">Y inicio:</label>
+                        <input type="text" id="slide-start-y" placeholder="0%" title="Ej: -100%, 0px, 100vh">
+                    </div>
+                </div>
+                
+                <label>Posición Final:</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <label style="font-size: 11px;">X final:</label>
+                        <input type="text" id="slide-end-x" placeholder="0%" title="Ej: 0%, 50%, center">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px;">Y final:</label>
+                        <input type="text" id="slide-end-y" placeholder="0%" title="Ej: 0%, 50%, center">
+                    </div>
+                </div>
+                
+                <label>Duración (segundos):</label>
+                <input type="number" id="slide-duration" min="0.1" max="10" step="0.1" value="1">
+                
+                <label>Retraso (segundos):</label>
+                <input type="number" id="slide-delay" min="0" max="10" step="0.1" value="0">
+                
+                <label>Easing:</label>
+                <select id="slide-easing">
+                    <option value="linear">Lineal</option>
+                    <option value="ease">Ease</option>
+                    <option value="ease-in">Ease In</option>
+                    <option value="ease-out">Ease Out</option>
+                    <option value="ease-in-out">Ease In-Out</option>
+                </select>
+            </div>
+            
+            <!-- Opciones para ZOOM -->
+            <div id="zoom-options" class="effect-options" style="display: none; margin-top: 10px;">
+                <h5 style="margin: 10px 0 5px; color: #666;">Configuración Zoom</h5>
+                <label>Escala Inicial:</label>
+                <input type="range" id="zoom-scale-start" min="0" max="3" step="0.1" value="0" style="width: 100%;">
+                <span id="zoom-scale-start-value" style="font-size: 12px; color: #666;">0x</span>
+                
+                <label>Escala Final:</label>
+                <input type="range" id="zoom-scale-end" min="0" max="3" step="0.1" value="1" style="width: 100%;">
+                <span id="zoom-scale-end-value" style="font-size: 12px; color: #666;">1x</span>
+                
+                <label>Punto de Origen:</label>
+                <select id="zoom-origin">
+                    <option value="center">Centro</option>
+                    <option value="top left">Arriba Izquierda</option>
+                    <option value="top right">Arriba Derecha</option>
+                    <option value="bottom left">Abajo Izquierda</option>
+                    <option value="bottom right">Abajo Derecha</option>
+                </select>
+                
+                <label>Duración (segundos):</label>
+                <input type="number" id="zoom-duration" min="0.1" max="10" step="0.1" value="1">
+                
+                <label>Retraso (segundos):</label>
+                <input type="number" id="zoom-delay" min="0" max="10" step="0.1" value="0">
+                
+                <label>Easing:</label>
+                <select id="zoom-easing">
+                    <option value="linear">Lineal</option>
+                    <option value="ease">Ease</option>
+                    <option value="ease-in">Ease In</option>
+                    <option value="ease-out">Ease Out</option>
+                    <option value="ease-in-out">Ease In-Out</option>
+                </select>
+            </div>
+            
+            <!-- Opciones para PARALLAX -->
+            <div id="parallax-options" class="effect-options" style="display: none; margin-top: 10px;">
+                <h5 style="margin: 10px 0 5px; color: #666;">Configuración Parallax</h5>
+                <label>Velocidad de Desplazamiento:</label>
+                <input type="range" id="parallax-speed" min="0.1" max="2" step="0.1" value="0.5" style="width: 100%;">
+                <span id="parallax-speed-value" style="font-size: 12px; color: #666;">0.5x</span>
+                <small style="display: block; color: #999; margin-top: 5px;">
+                    Menor a 1: más lento (fondo lejano)<br>
+                    Mayor a 1: más rápido (primer plano)
+                </small>
+                
+                <label>Dirección:</label>
+                <select id="parallax-direction">
+                    <option value="vertical">Vertical (scroll)</option>
+                    <option value="horizontal">Horizontal</option>
+                    <option value="both">Ambas</option>
+                </select>
+            </div>
+            
+            <button id="btn-save-background" style="margin-top: 15px; width: 100%;">💾 Guardar Cambios</button>
+        </div>
+        
+        <!-- Content Section -->
+        <h3>Contenido de Texto</h3>
+        <div class="control-group">
+            <label>Texto:</label>
+            <textarea id="scene-text" rows="3" placeholder="Texto que aparecerá en la escena"></textarea>
+            <label>Posición:</label>
+            <select id="scene-layout">
+                <option value="center">Centro</option>
+                <option value="top">Arriba</option>
+                <option value="bottom">Abajo</option>
+            </select>
+        </div>
+        
         <!-- Sprites Section -->
         <h3>Sprites</h3>
         <div class="control-group">
@@ -70,8 +272,14 @@
         </div>
 
         <div id="sprite-properties" class="control-group" style="display:none;">
-            <label>Sprite Seleccionado:</label>
-            <input type="text" id="sprite-src" placeholder="Ruta imagen (ej: sprites/p1.png)">
+            <label>Nombre del Sprite:</label>
+            <input type="text" id="sprite-name" placeholder="Nombre del sprite">
+            <label>Archivo de Imagen:</label>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="sprite-src" placeholder="Ruta imagen" readonly style="flex: 1;">
+                <button id="btn-upload-sprite" class="secondary" style="padding: 5px 10px;">📁 Subir</button>
+            </div>
+            <input type="file" id="sprite-file-input" accept="image/*" style="display: none;">
             <label>Tamaño:</label>
             <input type="text" id="sprite-size" placeholder="ej: 10%">
             

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Upload - ProyectoEñe</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            border: 2px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            background: #f0f0f0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        #file-list {
+            margin-top: 20px;
+        }
+        .file-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test de Upload - ProyectoEñe</h1>
+
+    <!-- Test 1: Listar Proyectos -->
+    <div class="test-section">
+        <h2>1. Listar Proyectos</h2>
+        <button onclick="testListProjects()">🔍 Listar Proyectos</button>
+        <div id="projects-result" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Test 2: Subir Background -->
+    <div class="test-section">
+        <h2>2. Subir Background</h2>
+        <label>Proyecto ID: <input type="text" id="project-bg" placeholder="aventura-interactiva"></label><br>
+        <input type="file" id="bg-file" accept="image/*">
+        <button onclick="testUploadBackground()">📤 Subir Background</button>
+        <div id="bg-result" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Test 3: Subir Sprite -->
+    <div class="test-section">
+        <h2>3. Subir Sprite</h2>
+        <label>Proyecto ID: <input type="text" id="project-sprite" placeholder="aventura-interactiva"></label><br>
+        <input type="file" id="sprite-file" accept="image/*">
+        <button onclick="testUploadSprite()">📤 Subir Sprite</button>
+        <div id="sprite-result" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Test 4: Ver Archivos del Proyecto -->
+    <div class="test-section">
+        <h2>4. Ver Archivos del Proyecto</h2>
+        <label>Proyecto ID: <input type="text" id="project-files" placeholder="aventura-interactiva"></label>
+        <button onclick="testGetProject()">📁 Ver Archivos</button>
+        <div id="files-result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        async function testListProjects() {
+            const result = document.getElementById('projects-result');
+            result.style.display = 'block';
+            result.innerHTML = '⏳ Cargando...';
+            
+            try {
+                const response = await fetch('api/list-projects.php');
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <strong>✅ ${data.message}</strong><br>
+                        <pre>${JSON.stringify(data.data, null, 2)}</pre>
+                    `;
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        async function testUploadBackground() {
+            const projectId = document.getElementById('project-bg').value;
+            const file = document.getElementById('bg-file').files[0];
+            const result = document.getElementById('bg-result');
+            
+            result.style.display = 'block';
+            
+            if (!projectId || !file) {
+                result.className = 'result error';
+                result.innerHTML = '❌ Debes proporcionar proyecto ID y seleccionar archivo';
+                return;
+            }
+            
+            result.innerHTML = '⏳ Subiendo...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('projectId', projectId);
+                formData.append('assetType', 'backgrounds');
+                formData.append('file', file);
+                
+                const response = await fetch('api/upload-asset.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <strong>✅ ${data.message}</strong><br>
+                        <strong>Archivo:</strong> ${data.data.name}<br>
+                        <strong>Ruta:</strong> ${data.data.path}<br>
+                        <strong>Tamaño:</strong> ${(data.data.size / 1024).toFixed(2)} KB<br>
+                        ${data.data.width ? `<strong>Dimensiones:</strong> ${data.data.width} x ${data.data.height}` : ''}
+                    `;
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        async function testUploadSprite() {
+            const projectId = document.getElementById('project-sprite').value;
+            const file = document.getElementById('sprite-file').files[0];
+            const result = document.getElementById('sprite-result');
+            
+            result.style.display = 'block';
+            
+            if (!projectId || !file) {
+                result.className = 'result error';
+                result.innerHTML = '❌ Debes proporcionar proyecto ID y seleccionar archivo';
+                return;
+            }
+            
+            result.innerHTML = '⏳ Subiendo...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('projectId', projectId);
+                formData.append('assetType', 'sprites');
+                formData.append('file', file);
+                
+                const response = await fetch('api/upload-asset.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <strong>✅ ${data.message}</strong><br>
+                        <strong>Archivo:</strong> ${data.data.name}<br>
+                        <strong>Ruta:</strong> ${data.data.path}<br>
+                        <strong>Tamaño:</strong> ${(data.data.size / 1024).toFixed(2)} KB<br>
+                        ${data.data.width ? `<strong>Dimensiones:</strong> ${data.data.width} x ${data.data.height}` : ''}
+                    `;
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        async function testGetProject() {
+            const projectId = document.getElementById('project-files').value;
+            const result = document.getElementById('files-result');
+            
+            result.style.display = 'block';
+            
+            if (!projectId) {
+                result.className = 'result error';
+                result.innerHTML = '❌ Debes proporcionar proyecto ID';
+                return;
+            }
+            
+            result.innerHTML = '⏳ Cargando...';
+            
+            try {
+                const response = await fetch(`api/get-project.php?projectId=${projectId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const assets = data.data.assets;
+                    let html = '<strong>✅ Archivos del proyecto:</strong><br><br>';
+                    
+                    // Backgrounds
+                    html += `<strong>🖼️ Backgrounds (${assets.backgrounds.length}):</strong><ul>`;
+                    assets.backgrounds.forEach(file => {
+                        html += `<li>${file.name} - ${(file.size / 1024).toFixed(2)} KB</li>`;
+                    });
+                    html += '</ul>';
+                    
+                    // Sprites
+                    html += `<strong>🎭 Sprites (${assets.sprites.length}):</strong><ul>`;
+                    assets.sprites.forEach(file => {
+                        html += `<li>${file.name} - ${(file.size / 1024).toFixed(2)} KB</li>`;
+                    });
+                    html += '</ul>';
+                    
+                    // Audio
+                    html += `<strong>🎵 Audio (${assets.audio.length}):</strong><ul>`;
+                    assets.audio.forEach(file => {
+                        html += `<li>${file.name} - ${(file.size / 1024).toFixed(2)} KB</li>`;
+                    });
+                    html += '</ul>';
+                    
+                    result.className = 'result success';
+                    result.innerHTML = html;
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

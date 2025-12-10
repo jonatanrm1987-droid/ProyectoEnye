@@ -6,6 +6,122 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [1.2.0] - 2025-12-10
+
+### ✨ Added - Sistema de Gestión de Assets y Fondos Avanzados
+
+#### **Backend PHP API**
+- **API REST completa** para gestión de proyectos y assets:
+  - `api/config.php`: Configuración común, helpers, validaciones
+  - `api/list-projects.php`: Listar todos los proyectos
+  - `api/get-project.php`: Obtener datos completos de un proyecto
+  - `api/create-project.php`: Crear nuevo proyecto con estructura de carpetas
+  - `api/save-project.php`: Guardar cambios con sistema de backups
+  - `api/delete-project.php`: Eliminar proyecto (recursivo)
+  - `api/upload-asset.php`: Subir assets (imágenes, audio) con validación MIME
+
+#### **Estructura de Proyectos en Disco**
+- Sistema de carpetas físicas por proyecto:
+  - `projects/{slug}/project.json`: Datos del proyecto
+  - `projects/{slug}/backgrounds/`: Fondos de escena
+  - `projects/{slug}/sprites/`: Sprites e imágenes
+  - `projects/{slug}/audio/`: Archivos de audio
+  - `projects/{slug}/README.md`: Documentación del proyecto
+- Script de migración `migrate.php` para convertir proyectos legacy
+
+#### **Gestión de Fondos con Animaciones**
+- **Sistema contextual de propiedades** según tipo de efecto:
+  - **Estático**: Posición fija (X, Y) y opacidad
+  - **Fade In/Out**: Opacidad inicial/final, duración, easing
+  - **Slide**: Posición inicial y final (X, Y), permite movimientos desde fuera de pantalla
+  - **Zoom In/Out**: Escala inicial/final, punto de origen, duración
+  - **Parallax**: Velocidad y dirección (vertical/horizontal/ambas)
+- **Modos de relleno**: cover, contain, stretch, repeat, no-repeat
+- **Panel dinámico**: Solo muestra campos relevantes según el tipo seleccionado
+- **Animaciones CSS**: Keyframes para fade, slide, zoom con control completo
+
+#### **Gestión de Assets Mejorada**
+- **Upload de fondos y sprites** con selector de archivos
+- **Naming system**: Nombres editables para todos los assets
+- **Preview inmediato**: Los cambios se reflejan automáticamente en el stage
+- **Validaciones**: Tipo MIME, tamaño máximo (10MB), sanitización de nombres
+
+#### **UI/UX Improvements**
+- **Drag-and-drop para reordenar capas de fondos**:
+  - jQuery UI Sortable para reorganización visual
+  - Actualización automática del z-index
+  - Indicadores visuales durante el arrastre
+  - Soporte para `user-select: none` evitando selección de texto
+- **Botones unificados**: Eliminar fondo ahora es un botón global
+- **Selección visual**: Fondos seleccionados con highlight azul
+- **File upload buttons**: Botón 📁 junto a cada campo de archivo
+
+### 🔧 Changed
+
+#### **ProjectManager Refactorizado**
+- Migrado de **localStorage a API REST**:
+  - Todas las operaciones ahora son `async/await`
+  - Uso de `fetch()` para comunicación con backend
+  - `FormData` para uploads multipart
+  - Manejo de errores con try-catch y logger
+- **Métodos actualizados**:
+  - `loadProjects()`: GET desde API
+  - `createProject()`: POST con validaciones
+  - `saveProjectData()`: POST con backups automáticos
+  - `deleteProject()`: DELETE con confirmación
+  - `uploadAsset()`: POST multipart con FormData
+- **Eliminados**: Métodos legacy de migración (`migrateLegacyProject`, `migrateFromScenesJSON`)
+
+#### **Editor.js Mejorado**
+- **refreshBackgroundList()**: Ahora con sortable y selección
+- **selectBackground()**: Carga contextual de opciones según tipo de efecto
+- **loadEffectOptions()**: Sistema de carga dinámica por tipo
+- **toggleEffectOptions()**: Muestra/oculta paneles según selección
+- **reorderBackgrounds()**: Reorganiza índices tras drag-and-drop
+- **applyBackgroundEffect()**: Aplica animaciones CSS en tiempo real
+- **renderStage()**: Soporte para posición, opacidad, fill mode y efectos
+- Auto-save con validación de disponibilidad del objeto
+
+#### **Dashboard HTML Reorganizado**
+- Sección de fondos con lista sortable
+- Botón global "Eliminar Fondo"
+- Panel de propiedades expandido con secciones colapsables
+- Inputs ocultos para file uploads
+- Organización por pestañas contextuales según efecto
+
+### 🎨 Styling
+- **Animaciones CSS** para efectos de fondos:
+  - `@keyframes bg-effect-fade-in/out`
+  - `@keyframes bg-effect-slide-left/right/up/down`
+  - `@keyframes bg-effect-zoom-in/out`
+  - Clase `.effect-parallax` con transitions
+- **UI Sortable**:
+  - `.bg-layer-item`: Estados hover y selected
+  - `.ui-sortable-helper`: Estilo durante drag
+  - `.ui-sortable-placeholder`: Indicador de posición
+- **Badges y etiquetas** para valores en tiempo real (opacidad, escala, velocidad)
+
+### 🐛 Fixed
+- **Null reference errors**: Validaciones en renderStage para backgrounds/sprites eliminados
+- **Sortable conflicts**: Destruir instancia antes de recrear
+- **Text selection**: `user-select: none` en items dragables
+- **Auto-save call**: Uso correcto de `autoSave.saveData()` en lugar de `autoSave()`
+- **Código duplicado**: Eliminada función `refreshBackgroundList` duplicada
+
+### 📝 Documentation
+- Comentarios en código para cada tipo de efecto
+- JSDoc para funciones principales del API
+- README.md generado automáticamente en cada proyecto
+
+### 🔒 Security
+- Validación MIME type en uploads
+- Sanitización de nombres de archivo
+- Límite de tamaño (10MB)
+- Prevención de path traversal
+- CORS headers configurados
+
+---
+
 ## [1.1.0] - 2025-12-10
 
 ### ✨ Added - Sistema Multi-Proyecto

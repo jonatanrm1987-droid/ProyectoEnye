@@ -18,7 +18,7 @@ let selectedSpriteId = null;
 let selectedActionIndex = null;
 let currentProjectId = null;
 
-$(document).ready(function() {
+$(document).ready(async function() {
     // Cargar proyecto activo o mostrar gestión
     loadActiveProject();
     
@@ -40,6 +40,7 @@ $(document).ready(function() {
     }
 
     $('#btn-add-scene').click(createScene);
+    $('#btn-delete-scene').click(deleteScene);
 
     function createScene() {
         const newId = Object.keys(gameData.scene_collection.scenes).length + 1;
@@ -54,6 +55,40 @@ $(document).ready(function() {
         logger.info('SceneManager', `Nueva escena creada: ${newId}`);
         refreshSceneList();
         loadScene(newId);
+    }
+
+    function deleteScene() {
+        if (!currentSceneId) {
+            showWarning('Selecciona una escena primero');
+            return;
+        }
+
+        const sceneCount = Object.keys(gameData.scene_collection.scenes).length;
+        if (sceneCount <= 1) {
+            showError('No puedes eliminar la única escena del proyecto');
+            return;
+        }
+
+        const sceneName = gameData.scene_collection.scenes[currentSceneId].title;
+        
+        if (confirm(`¿Estás seguro de eliminar la escena "${sceneName}"? Esta acción no se puede deshacer.`)) {
+            delete gameData.scene_collection.scenes[currentSceneId];
+            
+            // Si es la escena inicial, cambiar a la primera disponible
+            if (gameData.scene_collection.start_scene == currentSceneId) {
+                const firstSceneId = Object.keys(gameData.scene_collection.scenes)[0];
+                gameData.scene_collection.start_scene = firstSceneId;
+            }
+            
+            logger.info('SceneManager', `Escena eliminada: ${currentSceneId}`);
+            showSuccess(`Escena "${sceneName}" eliminada`);
+            
+            refreshSceneList();
+            
+            // Cargar la primera escena disponible
+            const nextSceneId = Object.keys(gameData.scene_collection.scenes)[0];
+            loadScene(nextSceneId);
+        }
     }
 
     $('#scene-selector').change(function() {
@@ -104,11 +139,39 @@ $(document).ready(function() {
         renderStage(scene);
         
         // Update Lists
+        refreshBackgroundList();
         refreshSpriteList();
         refreshActionList();
         
         // Highlight in selector
         $('#scene-selector').val(sceneId);
+    }
+
+    // Aplicar efectos y animaciones a fondos
+    function applyBackgroundEffect($element, effect) {
+        const duration = effect.duration || 1;
+        const delay = effect.delay || 0;
+        const easing = effect.easing || 'ease';
+        const loop = effect.loop || false;
+        
+        // CSS para la animación
+        const animationName = `bg-effect-${effect.type}`;
+        $element.css({
+            'animation-name': animationName,
+            'animation-duration': `${duration}s`,
+            'animation-delay': `${delay}s`,
+            'animation-timing-function': easing,
+            'animation-iteration-count': loop ? 'infinite' : '1',
+            'animation-fill-mode': 'forwards'
+        });
+        
+        // Añadir clase para el tipo de efecto
+        $element.addClass(`effect-${effect.type}`);
+        
+        // Para parallax, añadir atributo especial
+        if (effect.type === 'parallax') {
+            $element.attr('data-parallax-speed', effect.parallaxSpeed || 0.5);
+        }
     }
 
     function renderStage(scene) {
@@ -119,10 +182,40 @@ $(document).ready(function() {
         // Background Images
         if (scene["background-images"]) {
             $.each(scene["background-images"], function(k, bg) {
+                if (!bg || !bg.src) return; // Skip invalid backgrounds
                 const $bg = $('<div class="background-layer"></div>');
                 $bg.css('background-image', `url(${bg.src})`);
-                if(bg.opacity) $bg.css('opacity', bg.opacity);
-                if(bg.fill === 'stretch') $bg.css('background-size', '100% 100%');
+                $bg.attr('data-bg-id', k);
+                
+                // Posición
+                if (bg.position) {
+                    $bg.css('background-position', `${bg.position.x} ${bg.position.y}`);
+                }
+                
+                // Opacidad
+                if (bg.opacity !== undefined) {
+                    $bg.css('opacity', bg.opacity);
+                }
+                
+                // Modo de relleno
+                const fillMode = bg.fill || 'cover';
+                if (fillMode === 'stretch') {
+                    $bg.css('background-size', '100% 100%');
+                } else if (fillMode === 'repeat') {
+                    $bg.css('background-repeat', 'repeat');
+                    $bg.css('background-size', 'auto');
+                } else if (fillMode === 'no-repeat') {
+                    $bg.css('background-repeat', 'no-repeat');
+                    $bg.css('background-size', 'auto');
+                } else {
+                    $bg.css('background-size', fillMode); // cover o contain
+                }
+                
+                // Aplicar efectos/animaciones
+                if (bg.effect && bg.effect.type !== 'none') {
+                    applyBackgroundEffect($bg, bg.effect);
+                }
+                
                 $stage.append($bg);
             });
         }
@@ -130,6 +223,7 @@ $(document).ready(function() {
         // Sprites
         if (scene.sprites) {
             $.each(scene.sprites, function(key, sprite) {
+                if (!sprite || !sprite.src) return; // Skip invalid sprites
                 const $el = $('<img class="sprite">');
                 $el.attr('src', sprite.src);
                 $el.attr('data-id', key);
@@ -213,15 +307,423 @@ $(document).ready(function() {
         $('#stage-container').append($overlay);
     }
 
+    // --- Background Management ---
+    function refreshBackgroundList() {
+        const $list = $('#background-list');
+        
+        // Destruir sortable si ya existe
+        if ($list.hasClass('ui-sortable')) {
+            $list.sortable('destroy');
+        }
+        
+        $list.empty();
+        const scene = gameData.scene_collection.scenes[currentSceneId];
+        if (!scene || !scene['background-images']) return;
+
+        $.each(scene['background-images'], function(key, bg) {
+            if (!bg) return;
+            const displayName = bg.name || (bg.src ? bg.src.split('/').pop() : 'Sin nombre');
+            const $item = $(`
+                <div class="list-item bg-layer-item" data-key="${key}" style="padding: 5px; margin: 2px 0; background: #f8f9fa; border-radius: 3px; user-select: none; cursor: move;">
+                    <span class="bg-handle" style="user-select: none;">🖼️ ${displayName}</span>
+                </div>
+            `);
+            
+            // Click para seleccionar
+            $item.click(function(e) {
+                e.stopPropagation();
+                // Quitar selección previa
+                $('.bg-layer-item').removeClass('selected');
+                $item.addClass('selected');
+                selectedBackgroundId = key;
+                selectBackground(key);
+            });
+            
+            $list.append($item);
+        });
+
+        // Hacer la lista sortable (drag and drop)
+        $list.sortable({
+            axis: 'y',
+            cursor: 'move',
+            placeholder: 'ui-sortable-placeholder',
+            tolerance: 'pointer',
+            update: function(event, ui) {
+                reorderBackgrounds();
+            }
+        });
+    }
+
+    function reorderBackgrounds() {
+        const scene = gameData.scene_collection.scenes[currentSceneId];
+        if (!scene || !scene['background-images']) return;
+
+        console.log('Reordenando fondos...');
+
+        // Obtener el nuevo orden basado en la posición visual
+        const newOrder = {};
+        let index = 0;
+        $('#background-list .bg-layer-item').each(function() {
+            const key = $(this).data('key');
+            const bg = scene['background-images'][key];
+            if (bg) {
+                newOrder[index] = bg;
+                console.log(`Fondo "${bg.name || 'sin nombre'}" movido de key ${key} a index ${index}`);
+                index++;
+            }
+        });
+
+        // Actualizar el objeto con el nuevo orden
+        scene['background-images'] = newOrder;
+        
+        // Re-renderizar el stage para aplicar el nuevo orden
+        renderStage(scene);
+        
+        // Refrescar la lista para actualizar los data-key
+        refreshBackgroundList();
+        
+        // Guardar cambios
+        showInfo('Orden de capas actualizado');
+        
+        // Trigger auto-save si está disponible
+        if (typeof autoSave !== 'undefined' && autoSave.saveData) {
+            autoSave.saveData();
+        }
+    }
+
+    $('#btn-add-background').click(function() {
+        if (!currentSceneId) {
+            showWarning('Selecciona una escena primero');
+            return;
+        }
+        $('#background-file-input').click();
+    });
+
+    $('#btn-delete-background').click(function() {
+        if (!currentSceneId) {
+            showWarning('Selecciona una escena primero');
+            return;
+        }
+        if (!selectedBackgroundId && selectedBackgroundId !== 0) {
+            showWarning('Selecciona un fondo de la lista primero');
+            return;
+        }
+        deleteBackground(selectedBackgroundId);
+        selectedBackgroundId = null;
+    });
+
+    $('#background-file-input').change(async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!currentProjectId) {
+            showError('No hay proyecto activo');
+            return;
+        }
+
+        const bgName = prompt('Nombre del fondo:', file.name.replace(/\.[^/.]+$/, ''));
+        if (!bgName) {
+            $(this).val('');
+            return;
+        }
+
+        try {
+            showInfo('Subiendo fondo...');
+            const result = await projectManager.uploadAsset(currentProjectId, 'backgrounds', file);
+            
+            // Agregar a la escena
+            const scene = gameData.scene_collection.scenes[currentSceneId];
+            if (!scene['background-images']) {
+                scene['background-images'] = {};
+            }
+
+            const newKey = Object.keys(scene['background-images']).length + 1;
+            scene['background-images'][newKey] = {
+                name: bgName,
+                src: result.path,
+                position: 'center',
+                fill: 'cover',
+                opacity: 1
+            };
+
+            showSuccess('Fondo agregado');
+            refreshBackgroundList();
+            renderStage(scene);
+
+            // Limpiar input
+            $(this).val('');
+        } catch (error) {
+            showError('Error al subir fondo: ' + error.message);
+            logger.error('BackgroundUpload', error);
+        }
+    });
+
+    function deleteBackground(key) {
+        const scene = gameData.scene_collection.scenes[currentSceneId];
+        if (!scene['background-images'] || !scene['background-images'][key]) return;
+
+        if (confirm('¿Eliminar este fondo de la escena?')) {
+            delete scene['background-images'][key];
+            showSuccess('Fondo eliminado');
+            $('#background-properties').hide();
+            refreshBackgroundList();
+            renderStage(scene);
+        }
+    }
+
+    let selectedBackgroundId = null;
+
+    // Modificar refreshBackgroundList para hacer los fondos seleccionables
+    function selectBackground(key) {
+        selectedBackgroundId = key;
+        $('#background-properties').show();
+        $('#sprite-properties').hide();
+        $('#action-properties').hide();
+
+        const scene = gameData.scene_collection.scenes[currentSceneId];
+        const bg = scene['background-images'][key];
+        
+        // Propiedades básicas
+        $('#background-name').val(bg.name || '');
+        $('#background-src').val(bg.src || '');
+        $('#bg-fill').val(bg.fill || 'cover');
+        
+        // Determinar tipo de efecto
+        const effect = bg.effect || {};
+        const effectType = effect.type || 'static';
+        $('#bg-effect-type').val(effectType);
+        
+        // Cargar opciones específicas según el tipo
+        loadEffectOptions(effectType, effect);
+        
+        // Mostrar/ocultar paneles
+        toggleEffectOptions();
+    }
+    
+    function loadEffectOptions(type, effect) {
+        switch(type) {
+            case 'static':
+                $('#static-pos-x').val(effect.position?.x || 'center');
+                $('#static-pos-y').val(effect.position?.y || 'center');
+                $('#static-opacity').val(effect.opacity || 1);
+                $('#static-opacity-value').text(Math.round((effect.opacity || 1) * 100) + '%');
+                break;
+                
+            case 'fade-in':
+            case 'fade-out':
+                $('#fade-opacity-start').val(effect.opacityStart || 0);
+                $('#fade-opacity-start-value').text(Math.round((effect.opacityStart || 0) * 100) + '%');
+                $('#fade-opacity-end').val(effect.opacityEnd || 1);
+                $('#fade-opacity-end-value').text(Math.round((effect.opacityEnd || 1) * 100) + '%');
+                $('#fade-duration').val(effect.duration || 1);
+                $('#fade-delay').val(effect.delay || 0);
+                $('#fade-easing').val(effect.easing || 'ease');
+                break;
+                
+            case 'slide':
+                $('#slide-start-x').val(effect.startPosition?.x || '-100%');
+                $('#slide-start-y').val(effect.startPosition?.y || '0%');
+                $('#slide-end-x').val(effect.endPosition?.x || '0%');
+                $('#slide-end-y').val(effect.endPosition?.y || '0%');
+                $('#slide-duration').val(effect.duration || 1);
+                $('#slide-delay').val(effect.delay || 0);
+                $('#slide-easing').val(effect.easing || 'ease');
+                break;
+                
+            case 'zoom-in':
+            case 'zoom-out':
+                $('#zoom-scale-start').val(effect.scaleStart || 0);
+                $('#zoom-scale-start-value').text((effect.scaleStart || 0) + 'x');
+                $('#zoom-scale-end').val(effect.scaleEnd || 1);
+                $('#zoom-scale-end-value').text((effect.scaleEnd || 1) + 'x');
+                $('#zoom-origin').val(effect.origin || 'center');
+                $('#zoom-duration').val(effect.duration || 1);
+                $('#zoom-delay').val(effect.delay || 0);
+                $('#zoom-easing').val(effect.easing || 'ease');
+                break;
+                
+            case 'parallax':
+                $('#parallax-speed').val(effect.speed || 0.5);
+                $('#parallax-speed-value').text((effect.speed || 0.5) + 'x');
+                $('#parallax-direction').val(effect.direction || 'vertical');
+                break;
+        }
+    }
+    
+    // Mostrar/ocultar opciones según el tipo de efecto
+    function toggleEffectOptions() {
+        const effectType = $('#bg-effect-type').val();
+        
+        // Ocultar todas las opciones primero
+        $('.effect-options').hide();
+        
+        // Mostrar solo la sección relevante
+        switch(effectType) {
+            case 'static':
+                $('#static-options').show();
+                break;
+            case 'fade-in':
+            case 'fade-out':
+                $('#fade-options').show();
+                break;
+            case 'slide':
+                $('#slide-options').show();
+                break;
+            case 'zoom-in':
+            case 'zoom-out':
+                $('#zoom-options').show();
+                break;
+            case 'parallax':
+                $('#parallax-options').show();
+                break;
+        }
+    }
+    
+    // Event listeners para cambio de tipo
+    $('#bg-effect-type').change(toggleEffectOptions);
+    
+    // Event listeners para sliders con valores dinámicos
+    $('#static-opacity').on('input', function() {
+        $('#static-opacity-value').text(Math.round($(this).val() * 100) + '%');
+    });
+    
+    $('#fade-opacity-start').on('input', function() {
+        $('#fade-opacity-start-value').text(Math.round($(this).val() * 100) + '%');
+    });
+    
+    $('#fade-opacity-end').on('input', function() {
+        $('#fade-opacity-end-value').text(Math.round($(this).val() * 100) + '%');
+    });
+    
+    $('#zoom-scale-start').on('input', function() {
+        $('#zoom-scale-start-value').text($(this).val() + 'x');
+    });
+    
+    $('#zoom-scale-end').on('input', function() {
+        $('#zoom-scale-end-value').text($(this).val() + 'x');
+    });
+    
+    $('#parallax-speed').on('input', function() {
+        $('#parallax-speed-value').text($(this).val() + 'x');
+    });
+
+    $('#btn-upload-background').click(function() {
+        $('#background-update-input').click();
+    });
+
+    $('#background-update-input').change(async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            showInfo('Subiendo archivo...');
+            const result = await projectManager.uploadAsset(currentProjectId, 'backgrounds', file);
+            $('#background-src').val(result.path);
+            showSuccess('Archivo subido. Haz clic en "Guardar Cambios"');
+            $(this).val('');
+        } catch (error) {
+            showError('Error al subir: ' + error.message);
+        }
+    });
+
+    $('#btn-save-background').click(function() {
+        if (selectedBackgroundId === null && selectedBackgroundId !== 0) return;
+        
+        const scene = gameData.scene_collection.scenes[currentSceneId];
+        const bg = scene['background-images'][selectedBackgroundId];
+        
+        // Propiedades básicas
+        bg.name = $('#background-name').val();
+        bg.src = $('#background-src').val();
+        bg.fill = $('#bg-fill').val() || 'cover';
+        
+        // Recopilar efecto según el tipo seleccionado
+        const effectType = $('#bg-effect-type').val();
+        
+        switch(effectType) {
+            case 'static':
+                bg.effect = {
+                    type: 'static',
+                    position: {
+                        x: $('#static-pos-x').val() || 'center',
+                        y: $('#static-pos-y').val() || 'center'
+                    },
+                    opacity: parseFloat($('#static-opacity').val()) || 1
+                };
+                break;
+                
+            case 'fade-in':
+            case 'fade-out':
+                bg.effect = {
+                    type: effectType,
+                    opacityStart: parseFloat($('#fade-opacity-start').val()) || 0,
+                    opacityEnd: parseFloat($('#fade-opacity-end').val()) || 1,
+                    duration: parseFloat($('#fade-duration').val()) || 1,
+                    delay: parseFloat($('#fade-delay').val()) || 0,
+                    easing: $('#fade-easing').val() || 'ease'
+                };
+                break;
+                
+            case 'slide':
+                bg.effect = {
+                    type: 'slide',
+                    startPosition: {
+                        x: $('#slide-start-x').val() || '-100%',
+                        y: $('#slide-start-y').val() || '0%'
+                    },
+                    endPosition: {
+                        x: $('#slide-end-x').val() || '0%',
+                        y: $('#slide-end-y').val() || '0%'
+                    },
+                    duration: parseFloat($('#slide-duration').val()) || 1,
+                    delay: parseFloat($('#slide-delay').val()) || 0,
+                    easing: $('#slide-easing').val() || 'ease'
+                };
+                break;
+                
+            case 'zoom-in':
+            case 'zoom-out':
+                bg.effect = {
+                    type: effectType,
+                    scaleStart: parseFloat($('#zoom-scale-start').val()) || 0,
+                    scaleEnd: parseFloat($('#zoom-scale-end').val()) || 1,
+                    origin: $('#zoom-origin').val() || 'center',
+                    duration: parseFloat($('#zoom-duration').val()) || 1,
+                    delay: parseFloat($('#zoom-delay').val()) || 0,
+                    easing: $('#zoom-easing').val() || 'ease'
+                };
+                break;
+                
+            case 'parallax':
+                bg.effect = {
+                    type: 'parallax',
+                    speed: parseFloat($('#parallax-speed').val()) || 0.5,
+                    direction: $('#parallax-direction').val() || 'vertical'
+                };
+                break;
+        }
+        
+        showSuccess('Fondo actualizado con configuración ' + effectType);
+        refreshBackgroundList();
+        renderStage(scene);
+        
+        // Trigger auto-save
+        if (typeof autoSave !== 'undefined' && autoSave.saveData) {
+            autoSave.saveData();
+        }
+    });
+
     // --- Sprite Logic ---
     function refreshSpriteList() {
         const $list = $('#sprite-list');
         $list.empty();
         const scene = gameData.scene_collection.scenes[currentSceneId];
-        if (!scene.sprites) return;
+        if (!scene || !scene.sprites) return;
 
         $.each(scene.sprites, function(key, sprite) {
-            const $item = $(`<div class="list-item">Sprite ${key}</div>`);
+            if (!sprite) return; // Skip null/undefined sprites
+            const displayName = sprite.name || `Sprite ${key}`;
+            const $item = $(`<div class="list-item">${displayName}</div>`);
             $item.click(() => selectSprite(key));
             $list.append($item);
         });
@@ -229,11 +731,16 @@ $(document).ready(function() {
 
     $('#btn-add-sprite').click(function() {
         if(!currentSceneId) return;
+        
+        const spriteName = prompt('Nombre del sprite:', 'Sprite ' + (Object.keys(gameData.scene_collection.scenes[currentSceneId].sprites || {}).length + 1));
+        if (!spriteName) return;
+        
         const scene = gameData.scene_collection.scenes[currentSceneId];
         if(!scene.sprites) scene.sprites = {};
         
         const newKey = Object.keys(scene.sprites).length + 1;
         scene.sprites[newKey] = {
+            name: spriteName,
             src: "sprites/personaje1.png", // Default
             size: "10%",
             positions: { "1": {x: "50%", y: "50%"} }
@@ -246,11 +753,13 @@ $(document).ready(function() {
     function selectSprite(key) {
         selectedSpriteId = key;
         $('#sprite-properties').show();
+        $('#background-properties').hide();
         $('#action-properties').hide();
         $('.sprite').removeClass('selected');
         $(`.sprite[data-id="${key}"]`).addClass('selected');
 
         const sprite = gameData.scene_collection.scenes[currentSceneId].sprites[key];
+        $('#sprite-name').val(sprite.name || "");
         $('#sprite-src').val(sprite.src);
         $('#sprite-size').val(sprite.size);
 
@@ -293,6 +802,49 @@ $(document).ready(function() {
             selectSprite(selectedSpriteId); // Refresh list
             showSuccess(`Posición guardada como ID: ${nextPosIndex}`);
         });
+
+    $('#btn-upload-sprite').click(function() {
+        $('#sprite-file-input').click();
+    });
+
+    $('#sprite-file-input').change(async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!currentProjectId) {
+            showError('No hay proyecto activo');
+            return;
+        }
+
+        try {
+            showInfo('Subiendo sprite...');
+            const result = await projectManager.uploadAsset(currentProjectId, 'sprites', file);
+            $('#sprite-src').val(result.path);
+            
+            // Actualizar sprite inmediatamente
+            if (selectedSpriteId) {
+                const sprite = gameData.scene_collection.scenes[currentSceneId].sprites[selectedSpriteId];
+                sprite.src = result.path;
+                renderStage(gameData.scene_collection.scenes[currentSceneId]);
+            }
+            
+            showSuccess('Sprite subido y actualizado');
+            $(this).val('');
+        } catch (error) {
+            showError('Error al subir sprite: ' + error.message);
+        }
+    });
+
+    // Guardar cambios de nombre y tamaño del sprite
+    $('#sprite-name, #sprite-size').on('change', function() {
+        if (!selectedSpriteId) return;
+        const sprite = gameData.scene_collection.scenes[currentSceneId].sprites[selectedSpriteId];
+        sprite.name = $('#sprite-name').val();
+        sprite.size = $('#sprite-size').val();
+        refreshSpriteList();
+        renderStage(gameData.scene_collection.scenes[currentSceneId]);
+    });
+
     // --- Action/Button Logic ---
     function refreshActionList() {
         const $list = $('#action-list');
@@ -426,8 +978,8 @@ $(document).ready(function() {
     });
 
     // --- Project Management Functions ---
-    function loadActiveProject() {
-        const result = projectManager.loadLastActiveProject();
+    async function loadActiveProject() {
+        const result = await projectManager.loadLastActiveProject();
         
         if (result) {
             currentProjectId = result.project.id;
@@ -486,7 +1038,8 @@ $(document).ready(function() {
         $('#project-modal').show();
     }
     
-    function refreshProjectList() {
+    async function refreshProjectList() {
+        await projectManager.loadProjects();
         const projects = projectManager.getAllProjects();
         const $list = $('#project-list');
         $list.empty();
@@ -542,7 +1095,7 @@ $(document).ready(function() {
         });
     }
     
-    function handleCreateProject(e) {
+    async function handleCreateProject(e) {
         e.preventDefault();
         
         const name = $('#new-project-name').val().trim();
@@ -554,11 +1107,11 @@ $(document).ready(function() {
         }
         
         try {
-            const project = projectManager.createProject(name, description);
+            const project = await projectManager.createProject(name, description);
             showSuccess(`Proyecto "${name}" creado`);
             
             // Cargar el nuevo proyecto
-            loadProject(project.id);
+            await loadProject(project.id);
             
             // Cerrar modal y limpiar formulario
             $('#project-modal').hide();
@@ -569,13 +1122,13 @@ $(document).ready(function() {
         }
     }
     
-    function loadProject(projectId) {
+    async function loadProject(projectId) {
         try {
             // Detener auto-guardado actual
             autoSave.stop();
             
             // Cargar nuevo proyecto
-            const result = projectManager.loadProject(projectId);
+            const result = await projectManager.loadProject(projectId);
             currentProjectId = result.project.id;
             gameData = result.data;
             
@@ -604,15 +1157,15 @@ $(document).ready(function() {
         }
     }
     
-    function deleteProject(projectId) {
+    async function deleteProject(projectId) {
         const project = projectManager.getAllProjects().find(p => p.id === projectId);
         if (!project) return;
         
         if (confirm(`¿Estás seguro de eliminar el proyecto "${project.name}"? Esta acción no se puede deshacer.`)) {
             try {
-                projectManager.deleteProject(projectId);
+                await projectManager.deleteProject(projectId);
                 showSuccess(`Proyecto "${project.name}" eliminado`);
-                refreshProjectList();
+                await refreshProjectList();
             } catch (error) {
                 showError('Error al eliminar proyecto: ' + error.message);
                 logger.error('ProjectDelete', error);
@@ -620,17 +1173,19 @@ $(document).ready(function() {
         }
     }
     
-    function exportProject(projectId) {
+    async function exportProject(projectId) {
         try {
-            const exportData = projectManager.exportProject(projectId);
+            const exportData = await projectManager.getProjectData(projectId);
             const jsonStr = JSON.stringify(exportData, null, 2);
+            
+            const project = projectManager.getAllProjects().find(p => p.id === projectId);
             
             // Descargar archivo
             const blob = new Blob([jsonStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${exportData.projectInfo.name.replace(/\s+/g, '_')}.json`;
+            a.download = `${project.name.replace(/\s+/g, '_')}.json`;
             a.click();
             URL.revokeObjectURL(url);
             

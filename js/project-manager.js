@@ -1,154 +1,117 @@
 /**
  * ProjectManager - Sistema de gestión de múltiples proyectos
  * Cada proyecto contiene sus propias escenas, sprites, acciones y configuración
+ * Versión 2.0: Usa API PHP en lugar de localStorage
  */
 
 class ProjectManager {
     constructor() {
         this.currentProject = null;
         this.projects = [];
-        this.storageKey = 'proyectoEnye_projects';
-        this.projectPrefix = 'proyectoEnye_project_';
+        this.apiBase = 'api/';
         
-        this.loadProjects();
-        logger.info('ProjectManager inicializado');
+        logger.info('ProjectManager inicializado (API PHP)');
     }
 
     /**
-     * Cargar lista de proyectos desde localStorage
+     * Cargar lista de proyectos desde API
      */
-    loadProjects() {
+    async loadProjects() {
         try {
-            const stored = localStorage.getItem(this.storageKey);
-            if (stored) {
-                this.projects = JSON.parse(stored);
-                logger.info(`${this.projects.length} proyectos cargados`);
+            const response = await fetch(this.apiBase + 'list-projects.php');
+            const result = await response.json();
+            
+            if (result.success) {
+                this.projects = result.data || [];
+                logger.info(`${this.projects.length} proyectos cargados desde API`);
+                return this.projects;
             } else {
-                // Migrar proyecto legacy si existe auto-guardado antiguo
-                this.migrateLegacyProject();
+                throw new Error(result.error);
             }
         } catch (error) {
             logger.error('Error cargando proyectos:', error);
             this.projects = [];
+            throw error;
         }
     }
 
     /**
-     * Migrar auto-guardado antiguo a formato de proyecto
+     * Migración ya no se usa - Los proyectos se crean con la API PHP
      */
-    migrateLegacyProject() {
+    async migrateFromScenesJSON() {
+        logger.info('Migración automática deshabilitada. Use migrate.php para migrar proyectos legacy.');
+        return null;
+    }
+
+    /**
+     * Crear un nuevo proyecto (API)
+     */
+    async createProject(name, description = '') {
         try {
-            const legacyData = localStorage.getItem('proyectoEnye_autoSave');
-            if (legacyData) {
-                const data = JSON.parse(legacyData);
-                const project = this.createProject('Proyecto Legacy', 'Proyecto migrado automáticamente');
-                this.saveProjectData(project.id, data.data);
-                logger.info('Proyecto legacy migrado exitosamente');
-                // Limpiar auto-guardado antiguo
-                localStorage.removeItem('proyectoEnye_autoSave');
+            const response = await fetch(this.apiBase + 'create-project.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                const project = result.data;
+                await this.loadProjects(); // Recargar lista
+                logger.info(`Proyecto creado: ${name} (${project.id})`);
+                return project;
+            } else {
+                throw new Error(result.error);
             }
         } catch (error) {
-            logger.warn('No se pudo migrar proyecto legacy:', error);
+            logger.error('Error creando proyecto:', error);
+            throw error;
         }
     }
 
     /**
-     * Guardar lista de proyectos en localStorage
+     * Eliminar un proyecto (API)
      */
-    saveProjects() {
-        try {
-            localStorage.setItem(this.storageKey, JSON.stringify(this.projects));
-            logger.debug('Lista de proyectos guardada');
-        } catch (error) {
-            logger.error('Error guardando proyectos:', error);
-            throw new Error('No se pudo guardar la lista de proyectos');
-        }
-    }
-
-    /**
-     * Crear un nuevo proyecto
-     */
-    createProject(name, description = '') {
-        const project = {
-            id: this.generateId(),
-            name: name,
-            description: description,
-            createdAt: new Date().toISOString(),
-            modifiedAt: new Date().toISOString()
-        };
-
-        // Inicializar estructura de datos del proyecto
-        const projectData = {
-            scene_collection: {
-                title: name,
-                author: '',
-                start_scene: 'scene1'
-            },
-            scenes: {
-                scene1: {
-                    id: 'scene1',
-                    backgrounds: [],
-                    sprites: [],
-                    content: {},
-                    actions: [],
-                    time_events: []
-                }
-            },
-            settings: {
-                screen: {
-                    width: 1920,
-                    height: 1080
-                }
-            }
-        };
-
-        this.projects.push(project);
-        this.saveProjects();
-        this.saveProjectData(project.id, projectData);
-        
-        logger.info(`Proyecto creado: ${name} (${project.id})`);
-        return project;
-    }
-
-    /**
-     * Eliminar un proyecto
-     */
-    deleteProject(projectId) {
-        const index = this.projects.findIndex(p => p.id === projectId);
-        if (index === -1) {
-            throw new Error('Proyecto no encontrado');
-        }
-
-        const project = this.projects[index];
-        
-        // No permitir eliminar el proyecto activo sin antes cambiar
+    async deleteProject(projectId) {
+        // No permitir eliminar el proyecto activo
         if (this.currentProject && this.currentProject.id === projectId) {
             throw new Error('No puedes eliminar el proyecto activo. Cambia a otro proyecto primero.');
         }
 
-        // Eliminar datos del proyecto
-        localStorage.removeItem(this.projectPrefix + projectId);
-        
-        // Eliminar auto-guardado del proyecto
-        localStorage.removeItem(`proyectoEnye_autoSave_${projectId}`);
-
-        // Eliminar de la lista
-        this.projects.splice(index, 1);
-        this.saveProjects();
-
-        logger.info(`Proyecto eliminado: ${project.name}`);
+        try {
+            const response = await fetch(this.apiBase + `delete-project.php?projectId=${projectId}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                await this.loadProjects(); // Recargar lista
+                logger.info(`Proyecto eliminado: ${projectId}`);
+                return true;
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            logger.error('Error eliminando proyecto:', error);
+            throw error;
+        }
     }
 
     /**
-     * Obtener datos de un proyecto
+     * Obtener datos de un proyecto (API)
      */
-    getProjectData(projectId) {
+    async getProjectData(projectId) {
         try {
-            const stored = localStorage.getItem(this.projectPrefix + projectId);
-            if (!stored) {
-                throw new Error('Datos del proyecto no encontrados');
+            const response = await fetch(this.apiBase + `get-project.php?projectId=${projectId}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                return result.data;
+            } else {
+                throw new Error(result.error);
             }
-            return JSON.parse(stored);
         } catch (error) {
             logger.error(`Error cargando datos del proyecto ${projectId}:`, error);
             throw error;
@@ -156,39 +119,43 @@ class ProjectManager {
     }
 
     /**
-     * Guardar datos de un proyecto
+     * Guardar datos de un proyecto (API)
      */
-    saveProjectData(projectId, data) {
+    async saveProjectData(projectId, data) {
         try {
-            localStorage.setItem(this.projectPrefix + projectId, JSON.stringify(data));
+            const response = await fetch(this.apiBase + 'save-project.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId, data })
+            });
             
-            // Actualizar fecha de modificación
-            const project = this.projects.find(p => p.id === projectId);
-            if (project) {
-                project.modifiedAt = new Date().toISOString();
-                this.saveProjects();
+            const result = await response.json();
+            
+            if (result.success) {
+                logger.debug(`Datos del proyecto ${projectId} guardados`);
+                return true;
+            } else {
+                throw new Error(result.error);
             }
-            
-            logger.debug(`Datos del proyecto ${projectId} guardados`);
         } catch (error) {
             logger.error(`Error guardando datos del proyecto ${projectId}:`, error);
-            throw new Error('No se pudo guardar el proyecto');
+            throw error;
         }
     }
 
     /**
-     * Cargar un proyecto como activo
+     * Cargar un proyecto como activo (API)
      */
-    loadProject(projectId) {
+    async loadProject(projectId) {
         const project = this.projects.find(p => p.id === projectId);
         if (!project) {
             throw new Error('Proyecto no encontrado');
         }
 
-        const data = this.getProjectData(projectId);
+        const data = await this.getProjectData(projectId);
         this.currentProject = project;
         
-        // Guardar referencia al proyecto activo
+        // Guardar referencia al proyecto activo en localStorage
         localStorage.setItem('proyectoEnye_currentProject', projectId);
         
         logger.info(`Proyecto cargado: ${project.name}`);
@@ -272,21 +239,52 @@ class ProjectManager {
     }
 
     /**
-     * Cargar último proyecto activo
+     * Cargar último proyecto activo (API)
      */
-    loadLastActiveProject() {
+    async loadLastActiveProject() {
         try {
+            await this.loadProjects(); // Cargar lista primero
+            
             const lastProjectId = localStorage.getItem('proyectoEnye_currentProject');
             if (lastProjectId && this.projects.find(p => p.id === lastProjectId)) {
-                return this.loadProject(lastProjectId);
+                return await this.loadProject(lastProjectId);
             } else if (this.projects.length > 0) {
                 // Cargar el primer proyecto disponible
-                return this.loadProject(this.projects[0].id);
+                return await this.loadProject(this.projects[0].id);
             }
             return null;
         } catch (error) {
             logger.error('Error cargando último proyecto activo:', error);
             return null;
+        }
+    }
+    
+    /**
+     * Subir asset a un proyecto
+     */
+    async uploadAsset(projectId, assetType, file) {
+        try {
+            const formData = new FormData();
+            formData.append('projectId', projectId);
+            formData.append('assetType', assetType);
+            formData.append('file', file);
+            
+            const response = await fetch(this.apiBase + 'upload-asset.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                logger.info(`Asset subido: ${result.data.name}`);
+                return result.data;
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            logger.error('Error subiendo asset:', error);
+            throw error;
         }
     }
 }

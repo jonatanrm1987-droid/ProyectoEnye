@@ -126,6 +126,74 @@ h3 {
     border-radius: 4px; 
 }
 
+.control-group h4 {
+    margin: 0 0 8px 0;
+    color: #555;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+#background-list {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    padding: 5px;
+    min-height: 40px;
+}
+
+#background-list:empty::before {
+    content: "No hay fondos. Haz clic en '+ Añadir Fondo'";
+    display: block;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+    padding: 20px;
+    font-size: 12px;
+}
+
+.bg-layer-item {
+    transition: background-color 0.2s;
+}
+
+.bg-layer-item:hover {
+    background-color: #e9ecef !important;
+}
+
+.bg-layer-item.selected {
+    background-color: #007bff !important;
+    color: white;
+    font-weight: bold;
+}
+
+.ui-sortable-helper {
+    background-color: #007bff !important;
+    color: white;
+    opacity: 0.8;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.ui-sortable-placeholder {
+    background-color: #cce5ff !important;
+    border: 2px dashed #007bff;
+    visibility: visible !important;
+    height: 35px !important;
+}
+
+.btn-delete-bg {
+    background: #f56565 !important;
+    color: white !important;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-delete-bg:hover {
+    background: #e53e3e !important;
+}
+
 label { 
     display: block; 
     margin-bottom: 5px; 
@@ -506,4 +574,72 @@ button.danger {
 #auto-save-indicator.warning {
     background: rgba(255, 193, 7, 0.9);
     color: #333;
+}
+
+/* ============ ANIMACIONES DE FONDOS ============ */
+
+/* Fade In */
+@keyframes bg-effect-fade-in {
+    from { opacity: 0; }
+    to { opacity: var(--final-opacity, 1); }
+}
+
+/* Fade Out */
+@keyframes bg-effect-fade-out {
+    from { opacity: var(--initial-opacity, 1); }
+    to { opacity: 0; }
+}
+
+/* Slide Left */
+@keyframes bg-effect-slide-left {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+/* Slide Right */
+@keyframes bg-effect-slide-right {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+
+/* Slide Up */
+@keyframes bg-effect-slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+/* Slide Down */
+@keyframes bg-effect-slide-down {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+}
+
+/* Zoom In */
+@keyframes bg-effect-zoom-in {
+    from { 
+        transform: scale(0);
+        opacity: 0;
+    }
+    to { 
+        transform: scale(1);
+        opacity: var(--final-opacity, 1);
+    }
+}
+
+/* Zoom Out */
+@keyframes bg-effect-zoom-out {
+    from { 
+        transform: scale(1);
+        opacity: var(--initial-opacity, 1);
+    }
+    to { 
+        transform: scale(0);
+        opacity: 0;
+    }
+}
+
+/* Parallax - Se maneja con JavaScript durante scroll/movimiento */
+.effect-parallax {
+    will-change: transform;
+    transition: transform 0.1s ease-out;
 }
