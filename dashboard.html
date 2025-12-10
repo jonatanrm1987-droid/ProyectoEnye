@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aventura Interactiva - Dashboard Editor</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/editor.css">
+    <link rel="stylesheet" href="css/notifications.css">
+</head>
+<body>
+
+    <!-- Left Sidebar: Scene Management -->
+    <div id="sidebar-left">
+        <!-- Project Selector -->
+        <div class="project-header">
+            <h3 id="current-project-name">Sin proyecto</h3>
+            <button id="btn-manage-projects" class="icon-button" title="Gestionar Proyectos">📁</button>
+        </div>
+        
+        <h3>Escenas</h3>
+        <select id="scene-selector" size="5" style="height: 150px; margin-bottom: 10px;"></select>
+        <button id="btn-add-scene">Nueva Escena</button>
+        
+        <div id="scene-properties" class="control-group" style="display:none;">
+            <label>ID Escena:</label>
+            <input type="text" id="scene-id" readonly>
+            <label>Título:</label>
+            <input type="text" id="scene-title">
+            <label>Color Fondo:</label>
+            <input type="color" id="scene-bg-color">
+            <label>Texto Contenido:</label>
+            <textarea id="scene-text" rows="3"></textarea>
+            <label>Layout Texto:</label>
+            <select id="scene-layout">
+                <option value="center">Centro</option>
+                <option value="top">Arriba</option>
+                <option value="bottom">Abajo</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <button id="btn-export-json" class="secondary">Ver/Exportar JSON</button>
+            <button id="btn-save-manual" class="secondary">💾 Guardar Ahora</button>
+            <button id="btn-clear-autosave" class="danger" style="font-size: 12px;">Limpiar Auto-guardado</button>
+        </div>
+    </div>
+
+    <!-- Main Area: Stage -->
+    <div id="main-area">
+        <div id="stage-container">
+            <!-- Dynamic Content Here -->
+        </div>
+        <div style="color: #ccc; margin-top: 10px;">
+            Arrastra los elementos para posicionarlos.
+        </div>
+    </div>
+
+    <!-- Right Sidebar: Sprites & Actions -->
+    <div id="sidebar-right">
+        
+        <!-- Sprites Section -->
+        <h3>Sprites</h3>
+        <div class="control-group">
+            <div id="sprite-list"></div>
+            <button id="btn-add-sprite" class="secondary" style="margin-top:5px;">+ Añadir Sprite</button>
+        </div>
+
+        <div id="sprite-properties" class="control-group" style="display:none;">
+            <label>Sprite Seleccionado:</label>
+            <input type="text" id="sprite-src" placeholder="Ruta imagen (ej: sprites/p1.png)">
+            <label>Tamaño:</label>
+            <input type="text" id="sprite-size" placeholder="ej: 10%">
+            
+            <hr>
+            <label>Posiciones Guardadas:</label>
+            <div id="sprite-positions-list" style="max-height: 100px; overflow-y: auto; margin-bottom: 5px;"></div>
+            
+            <button id="btn-save-sprite-pos">Guardar Posición Actual</button>
+            <small style="display:block; color: #666; margin-bottom: 5px;">Arrastra el sprite en el escenario y pulsa guardar para añadir una nueva posición.</small>
+        </div>
+
+        <!-- Actions/Buttons Section -->
+        <h3>Botones / Acciones</h3>
+        <div class="control-group">
+            <div id="action-list"></div>
+            <button id="btn-add-button" class="secondary" style="margin-top:5px;">+ Añadir Botón</button>
+        </div>
+
+        <div id="action-properties" class="control-group" style="display:none;">
+            <label>Etiqueta Botón:</label>
+            <input type="text" id="action-label">
+            <label>Tipo Acción:</label>
+            <select id="action-type">
+                <option value="button">Botón (Cambio Escena)</option>
+                <option value="sprite-move">Mover Sprite</option>
+            </select>
+            
+            <div id="target-scene-group">
+                <label>Target (ID Escena):</label>
+                <input type="number" id="action-target-scene">
+            </div>
+
+            <div id="target-sprite-group" style="display:none;">
+                <label>Target (ID Sprite):</label>
+                <input type="text" id="action-target-sprite" placeholder="ej: sprites1">
+                <label>Siguiente Posición (ID):</label>
+                <input type="number" id="action-next-pos">
+            </div>
+
+            <button id="btn-delete-action" class="danger">Eliminar Botón</button>
+        </div>
+
+        <!-- Time Events -->
+        <h3>Eventos de Tiempo</h3>
+        <div class="control-group">
+            <div id="time-event-list"></div>
+            <button id="btn-add-time-event" class="secondary">+ Añadir Evento Tiempo</button>
+        </div>
+
+    </div>
+
+    <!-- JSON Export Modal -->
+    <div id="json-output-modal">
+        <div id="json-output-content">
+            <h3>JSON Generado</h3>
+            <textarea id="json-textarea"></textarea>
+            <div style="margin-top: 10px; text-align: right;">
+                <button onclick="$('#json-output-modal').hide()" style="width: auto;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Management Modal -->
+    <div id="project-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Gestión de Proyectos</h2>
+                <button class="close-modal" onclick="$('#project-modal').hide()">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Project List -->
+                <div class="project-list-container">
+                    <h3>Proyectos Existentes</h3>
+                    <div id="project-list" class="project-list">
+                        <!-- Projects will be dynamically loaded here -->
+                    </div>
+                </div>
+
+                <!-- Create New Project -->
+                <div class="project-form-container">
+                    <h3>Crear Nuevo Proyecto</h3>
+                    <form id="new-project-form">
+                        <div class="form-group">
+                            <label for="new-project-name">Nombre del Proyecto:</label>
+                            <input type="text" id="new-project-name" required placeholder="Mi Aventura">
+                        </div>
+                        <div class="form-group">
+                            <label for="new-project-description">Descripción:</label>
+                            <textarea id="new-project-description" rows="3" placeholder="Descripción del proyecto..."></textarea>
+                        </div>
+                        <button type="submit" class="btn-primary">Crear Proyecto</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="js/logger.js"></script>
+<script src="js/error-handler.js"></script>
+<script src="js/notifications.js"></script>
+<script src="js/project-manager.js"></script>
+<script src="js/auto-save.js"></script>
+<script src="js/editor.js"></script>
+
+</body>
+</html>

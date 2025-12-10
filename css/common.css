@@ -1,0 +1,71 @@
+/* ===================================
+   PROYECTOENYE - COMMON STYLES
+   Estilos compartidos entre viewer y editor
+   Versión: 1.0.0
+   =================================== */
+
+/* ============ RESET COMÚN ============ */
+* {
+    box-sizing: border-box;
+}
+
+/* ============ CONTENEDORES DE ESCENA ============ */
+#scene-container,
+#stage-container {
+    background-color: #000;
+    position: relative;
+    overflow: hidden;
+}
+
+/* ============ CAPAS DE FONDO ============ */
+.background-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    pointer-events: none;
+}
+
+/* ============ SPRITES ============ */
+.sprite {
+    position: absolute;
+    transition: all 0.8s ease;
+}
+
+/* ============ BOTONES DE ACCIÓN ============ */
+.action-button {
+    position: absolute;
+    padding: 10px 20px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border: 2px solid white;
+    color: white;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+/* ============ OVERLAY DE CONTENIDO ============ */
+.content-overlay {
+    position: absolute;
+    pointer-events: none;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+    padding: 20px;
+}
+
+.content-center {
+    text-align: center;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.content-top {
+    top: 0;
+}
+
+.content-bottom {
+    bottom: 0;
+}
