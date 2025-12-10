@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aventura Interactiva - Dashboard Editor</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            background-color: #f0f0f0;
+            overflow: hidden;
+        }
+
+        /* Layout */
+        #sidebar-left, #sidebar-right {
+            width: 300px;
+            background-color: #fff;
+            border-right: 1px solid #ccc;
+            border-left: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            overflow-y: auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        #main-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #333;
+            position: relative;
+        }
+
+        /* Stage (Preview) */
+        #stage-container {
+            width: 800px;
+            height: 450px; /* 16:9 aspect ratio */
+            background-color: #000;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border: 2px solid #555;
+        }
+
+        .background-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-size: cover;
+            background-position: center;
+            pointer-events: none;
+        }
+
+        .sprite {
+            position: absolute;
+            cursor: move;
+            border: 1px dashed transparent;
+        }
+        .sprite:hover, .sprite.selected {
+            border: 1px dashed #fff;
+            box-shadow: 0 0 5px #00f;
+        }
+
+        .action-button {
+            position: absolute;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            cursor: move;
+            border-radius: 5px;
+        }
+        .action-button.selected {
+            border-color: #00f;
+            background-color: rgba(0, 0, 255, 0.2);
+        }
+
+        .content-overlay {
+            position: absolute;
+            pointer-events: none;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+            padding: 20px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .content-center { text-align: center; top: 50%; transform: translateY(-50%); }
+        .content-top { top: 0; }
+        .content-bottom { bottom: 0; }
+
+        /* UI Controls */
+        h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        .control-group { margin-bottom: 15px; border: 1px solid #eee; padding: 10px; border-radius: 4px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+        input, select, textarea { width: 100%; margin-bottom: 5px; padding: 5px; box-sizing: border-box; }
+        button {
+            background-color: #007bff; color: white; border: none; padding: 8px 12px;
+            cursor: pointer; border-radius: 4px; width: 100%; margin-bottom: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button.secondary { background-color: #6c757d; }
+        button.danger { background-color: #dc3545; }
+        
+        .list-item {
+            padding: 5px; background: #f8f9fa; border: 1px solid #ddd; margin-bottom: 2px;
+            cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+        }
+        .list-item:hover { background: #e2e6ea; }
+        .list-item.active { background: #cce5ff; border-color: #b8daff; }
+
+        #json-output-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;
+        }
+        #json-output-content {
+            background: white; padding: 20px; width: 80%; height: 80%; display: flex; flex-direction: column;
+        }
+        #json-textarea { flex-grow: 1; font-family: monospace; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Left Sidebar: Scene Management -->
+    <div id="sidebar-left">
+        <h3>Escenas</h3>
+        <select id="scene-selector" size="5" style="height: 150px; margin-bottom: 10px;"></select>
+        <button id="btn-add-scene">Nueva Escena</button>
+        
+        <div id="scene-properties" class="control-group" style="display:none;">
+            <label>ID Escena:</label>
+            <input type="text" id="scene-id" readonly>
+            <label>Título:</label>
+            <input type="text" id="scene-title">
+            <label>Color Fondo:</label>
+            <input type="color" id="scene-bg-color">
+            <label>Texto Contenido:</label>
+            <textarea id="scene-text" rows="3"></textarea>
+            <label>Layout Texto:</label>
+            <select id="scene-layout">
+                <option value="center">Centro</option>
+                <option value="top">Arriba</option>
+                <option value="bottom">Abajo</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <button id="btn-export-json" class="secondary">Ver/Exportar JSON</button>
+        </div>
+    </div>
+
+    <!-- Main Area: Stage -->
+    <div id="main-area">
+        <div id="stage-container">
+            <!-- Dynamic Content Here -->
+        </div>
+        <div style="color: #ccc; margin-top: 10px;">
+            Arrastra los elementos para posicionarlos.
+        </div>
+    </div>
+
+    <!-- Right Sidebar: Sprites & Actions -->
+    <div id="sidebar-right">
+        
+        <!-- Sprites Section -->
+        <h3>Sprites</h3>
+        <div class="control-group">
+            <div id="sprite-list"></div>
+            <button id="btn-add-sprite" class="secondary" style="margin-top:5px;">+ Añadir Sprite</button>
+        </div>
+
+        <div id="sprite-properties" class="control-group" style="display:none;">
+            <label>Sprite Seleccionado:</label>
+            <input type="text" id="sprite-src" placeholder="Ruta imagen (ej: sprites/p1.png)">
+            <label>Tamaño:</label>
+            <input type="text" id="sprite-size" placeholder="ej: 10%">
+            
+            <hr>
+            <label>Posiciones Guardadas:</label>
+            <div id="sprite-positions-list" style="max-height: 100px; overflow-y: auto; margin-bottom: 5px;"></div>
+            
+            <button id="btn-save-sprite-pos">Guardar Posición Actual</button>
+            <small style="display:block; color: #666; margin-bottom: 5px;">Arrastra el sprite en el escenario y pulsa guardar para añadir una nueva posición.</small>
+        </div>
+
+        <!-- Actions/Buttons Section -->
+        <h3>Botones / Acciones</h3>
+        <div class="control-group">
+            <div id="action-list"></div>
+            <button id="btn-add-button" class="secondary" style="margin-top:5px;">+ Añadir Botón</button>
+        </div>
+
+        <div id="action-properties" class="control-group" style="display:none;">
+            <label>Etiqueta Botón:</label>
+            <input type="text" id="action-label">
+            <label>Tipo Acción:</label>
+            <select id="action-type">
+                <option value="button">Botón (Cambio Escena)</option>
+                <option value="sprite-move">Mover Sprite</option>
+            </select>
+            
+            <div id="target-scene-group">
+                <label>Target (ID Escena):</label>
+                <input type="number" id="action-target-scene">
+            </div>
+
+            <div id="target-sprite-group" style="display:none;">
+                <label>Target (ID Sprite):</label>
+                <input type="text" id="action-target-sprite" placeholder="ej: sprites1">
+                <label>Siguiente Posición (ID):</label>
+                <input type="number" id="action-next-pos">
+            </div>
+
+            <button id="btn-delete-action" class="danger">Eliminar Botón</button>
+        </div>
+
+        <!-- Time Events -->
+        <h3>Eventos de Tiempo</h3>
+        <div class="control-group">
+            <div id="time-event-list"></div>
+            <button id="btn-add-time-event" class="secondary">+ Añadir Evento Tiempo</button>
+        </div>
+
+    </div>
+
+    <!-- JSON Export Modal -->
+    <div id="json-output-modal">
+        <div id="json-output-content">
+            <h3>JSON Generado</h3>
+            <textarea id="json-textarea"></textarea>
+            <div style="margin-top: 10px; text-align: right;">
+                <button onclick="$('#json-output-modal').hide()" style="width: auto;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let gameData = {
+        scene_collection: {
+            title: "Nueva Aventura",
+            start_scene: 1,
+            scenes: {}
+        },
+        settings: { defaultTransitionDuration: 800 }
+    };
+
+    let currentSceneId = null;
+    let selectedSpriteId = null;
+    let selectedActionIndex = null;
+
+    $(document).ready(function() {
+        // Try to load existing scenes.json
+        $.getJSON('scenes.json', function(data) {
+            gameData = data;
+            refreshSceneList();
+            if (gameData.scene_collection.start_scene) {
+                loadScene(gameData.scene_collection.start_scene);
+            }
+        }).fail(function() {
+            console.log("No scenes.json found, starting fresh.");
+            // Create a default scene if empty
+            createScene();
+        });
+
+        // --- Scene Management ---
+        function refreshSceneList() {
+            const $sel = $('#scene-selector');
+            $sel.empty();
+            $.each(gameData.scene_collection.scenes, function(id, scene) {
+                $sel.append(`<option value="${id}">${id}: ${scene.title}</option>`);
+            });
+        }
+
+        $('#btn-add-scene').click(createScene);
+
+        function createScene() {
+            const newId = Object.keys(gameData.scene_collection.scenes).length + 1;
+            gameData.scene_collection.scenes[newId] = {
+                id: newId,
+                title: "Nueva Escena",
+                "background-color": "#000000",
+                content: { heading: "", text: "", layout: "center" },
+                sprites: {},
+                actions: []
+            };
+            refreshSceneList();
+            loadScene(newId);
+        }
+
+        $('#scene-selector').change(function() {
+            loadScene($(this).val());
+        });
+
+        // Bind Scene Properties inputs
+        $('#scene-title').on('input', function() {
+            if(!currentSceneId) return;
+            gameData.scene_collection.scenes[currentSceneId].title = $(this).val();
+            $(`#scene-selector option[value="${currentSceneId}"]`).text(`${currentSceneId}: ${$(this).val()}`);
+        });
+        $('#scene-bg-color').on('input', function() {
+            if(!currentSceneId) return;
+            const color = $(this).val();
+            gameData.scene_collection.scenes[currentSceneId]["background-color"] = color;
+            $('#stage-container').css('background-color', color);
+        });
+        $('#scene-text').on('input', function() {
+            if(!currentSceneId) return;
+            gameData.scene_collection.scenes[currentSceneId].content.text = $(this).val();
+            renderContentOverlay();
+        });
+        $('#scene-layout').change(function() {
+            if(!currentSceneId) return;
+            gameData.scene_collection.scenes[currentSceneId].content.layout = $(this).val();
+            renderContentOverlay();
+        });
+
+
+        // --- Main Loading Logic ---
+        function loadScene(sceneId) {
+            currentSceneId = sceneId;
+            selectedSpriteId = null;
+            selectedActionIndex = null;
+            
+            const scene = gameData.scene_collection.scenes[sceneId];
+            
+            // Update UI Inputs
+            $('#scene-properties').show();
+            $('#scene-id').val(scene.id);
+            $('#scene-title').val(scene.title);
+            $('#scene-bg-color').val(scene["background-color"] || "#000000");
+            $('#scene-text').val(scene.content ? scene.content.text : "");
+            $('#scene-layout').val(scene.content ? scene.content.layout : "center");
+
+            // Render Stage
+            renderStage(scene);
+            
+            // Update Lists
+            refreshSpriteList();
+            refreshActionList();
+            
+            // Highlight in selector
+            $('#scene-selector').val(sceneId);
+        }
+
+        function renderStage(scene) {
+            const $stage = $('#stage-container');
+            $stage.empty();
+            $stage.css('background-color', scene["background-color"] || "#000");
+
+            // Background Images
+            if (scene["background-images"]) {
+                $.each(scene["background-images"], function(k, bg) {
+                    const $bg = $('<div class="background-layer"></div>');
+                    $bg.css('background-image', `url(${bg.src})`);
+                    if(bg.opacity) $bg.css('opacity', bg.opacity);
+                    if(bg.fill === 'stretch') $bg.css('background-size', '100% 100%');
+                    $stage.append($bg);
+                });
+            }
+
+            // Sprites
+            if (scene.sprites) {
+                $.each(scene.sprites, function(key, sprite) {
+                    const $el = $('<img class="sprite">');
+                    $el.attr('src', sprite.src);
+                    $el.attr('data-id', key);
+                    
+                    // Default to position 1 for preview
+                    const pos = sprite.positions && sprite.positions["1"] ? sprite.positions["1"] : {x: "50%", y: "50%"};
+                    $el.css({ left: pos.x, top: pos.y, width: sprite.size || "10%" });
+
+                    // Make Draggable
+                    $el.draggable({
+                        containment: "parent",
+                        stop: function(event, ui) {
+                            // Just visual update, saving is manual
+                            selectSprite(key);
+                        }
+                    });
+
+                    $el.click(function(e) {
+                        e.stopPropagation();
+                        selectSprite(key);
+                    });
+
+                    $stage.append($el);
+                });
+            }
+
+            // Buttons
+            if (scene.actions) {
+                scene.actions.forEach((action, index) => {
+                    if (action.type === 'button') {
+                        const $btn = $('<button class="action-button"></button>');
+                        $btn.text(action.label);
+                        $btn.attr('data-index', index);
+                        
+                        const pos = action.position || {top: "50%", left: "50%"};
+                        $btn.css({ top: pos.top, left: pos.left });
+
+                        $btn.draggable({
+                            containment: "parent",
+                            stop: function(event, ui) {
+                                // Auto-save button position
+                                const parentWidth = $stage.width();
+                                const parentHeight = $stage.height();
+                                const leftPerc = Math.round((ui.position.left / parentWidth) * 100) + "%";
+                                const topPerc = Math.round((ui.position.top / parentHeight) * 100) + "%";
+                                
+                                gameData.scene_collection.scenes[currentSceneId].actions[index].position = {
+                                    top: topPerc,
+                                    left: leftPerc
+                                };
+                                selectAction(index);
+                            }
+                        });
+
+                        $btn.click(function(e) {
+                            e.stopPropagation();
+                            selectAction(index);
+                        });
+
+                        $stage.append($btn);
+                    }
+                });
+            }
+
+            renderContentOverlay();
+        }
+
+        function renderContentOverlay() {
+            $('.content-overlay').remove();
+            const scene = gameData.scene_collection.scenes[currentSceneId];
+            if (!scene.content) return;
+
+            const $overlay = $('<div class="content-overlay"></div>');
+            if (scene.content.heading) $overlay.append(`<h1>${scene.content.heading}</h1>`);
+            if (scene.content.text) $overlay.append(`<p>${scene.content.text}</p>`);
+            
+            if (scene.content.layout === 'center') $overlay.addClass('content-center');
+            else if (scene.content.layout === 'top') $overlay.addClass('content-top');
+            else if (scene.content.layout === 'bottom') $overlay.addClass('content-bottom');
+
+            $('#stage-container').append($overlay);
+        }
+
+        // --- Sprite Logic ---
+        function refreshSpriteList() {
+            const $list = $('#sprite-list');
+            $list.empty();
+            const scene = gameData.scene_collection.scenes[currentSceneId];
+            if (!scene.sprites) return;
+
+            $.each(scene.sprites, function(key, sprite) {
+                const $item = $(`<div class="list-item">Sprite ${key}</div>`);
+                $item.click(() => selectSprite(key));
+                $list.append($item);
+            });
+        }
+
+        $('#btn-add-sprite').click(function() {
+            if(!currentSceneId) return;
+            const scene = gameData.scene_collection.scenes[currentSceneId];
+            if(!scene.sprites) scene.sprites = {};
+            
+            const newKey = Object.keys(scene.sprites).length + 1;
+            scene.sprites[newKey] = {
+                src: "sprites/personaje1.png", // Default
+                size: "10%",
+                positions: { "1": {x: "50%", y: "50%"} }
+            };
+            
+            loadScene(currentSceneId); // Reload to render
+            selectSprite(newKey.toString());
+        });
+
+        function selectSprite(key) {
+            selectedSpriteId = key;
+            $('#sprite-properties').show();
+            $('#action-properties').hide();
+            $('.sprite').removeClass('selected');
+            $(`.sprite[data-id="${key}"]`).addClass('selected');
+
+            const sprite = gameData.scene_collection.scenes[currentSceneId].sprites[key];
+            $('#sprite-src').val(sprite.src);
+            $('#sprite-size').val(sprite.size);
+
+            // List positions
+            const $posList = $('#sprite-positions-list');
+            $posList.empty();
+            if(sprite.positions) {
+                $.each(sprite.positions, function(pKey, pos) {
+                    $posList.append(`<div><strong>${pKey}:</strong> x:${pos.x}, y:${pos.y}</div>`);
+                });
+            }
+        }
+
+        $('#sprite-src').change(function() {
+            if(!selectedSpriteId) return;
+            gameData.scene_collection.scenes[currentSceneId].sprites[selectedSpriteId].src = $(this).val();
+            $(`.sprite[data-id="${selectedSpriteId}"]`).attr('src', $(this).val());
+        });
+
+        $('#sprite-size').change(function() {
+            if(!selectedSpriteId) return;
+            gameData.scene_collection.scenes[currentSceneId].sprites[selectedSpriteId].size = $(this).val();
+            $(`.sprite[data-id="${selectedSpriteId}"]`).css('width', $(this).val());
+        });
+
+        $('#btn-save-sprite-pos').click(function() {
+            if(!selectedSpriteId) return;
+            const $el = $(`.sprite[data-id="${selectedSpriteId}"]`);
+            const $stage = $('#stage-container');
+            
+            // Calculate percentage
+            const leftPerc = Math.round(($el.position().left / $stage.width()) * 100) + "%";
+            const topPerc = Math.round(($el.position().top / $stage.height()) * 100) + "%";
+
+            const sprite = gameData.scene_collection.scenes[currentSceneId].sprites[selectedSpriteId];
+            const nextPosIndex = Object.keys(sprite.positions).length + 1;
+            
+            sprite.positions[nextPosIndex] = { x: leftPerc, y: topPerc };
+            
+            selectSprite(selectedSpriteId); // Refresh list
+            alert(`Posición guardada como ID: ${nextPosIndex}`);
+        });
+
+
+        // --- Action/Button Logic ---
+        function refreshActionList() {
+            const $list = $('#action-list');
+            $list.empty();
+            const scene = gameData.scene_collection.scenes[currentSceneId];
+            if (!scene.actions) return;
+
+            scene.actions.forEach((action, index) => {
+                if(action.type === 'button') {
+                    const $item = $(`<div class="list-item">Botón: ${action.label}</div>`);
+                    $item.click(() => selectAction(index));
+                    $list.append($item);
+                }
+            });
+        }
+
+        $('#btn-add-button').click(function() {
+            if(!currentSceneId) return;
+            const scene = gameData.scene_collection.scenes[currentSceneId];
+            if(!scene.actions) scene.actions = [];
+            
+            scene.actions.push({
+                type: "button",
+                label: "Nuevo Botón",
+                target: 1,
+                position: { top: "50%", left: "50%" }
+            });
+            
+            loadScene(currentSceneId);
+        });
+
+        function selectAction(index) {
+            selectedActionIndex = index;
+            $('#action-properties').show();
+            $('#sprite-properties').hide();
+            $('.action-button').removeClass('selected');
+            $(`.action-button[data-index="${index}"]`).addClass('selected');
+
+            const action = gameData.scene_collection.scenes[currentSceneId].actions[index];
+            $('#action-label').val(action.label);
+            $('#action-type').val(action.target && typeof action.target === 'string' && action.target.startsWith('sprites') ? 'sprite-move' : 'button');
+            
+            updateActionTypeUI();
+
+            if ($('#action-type').val() === 'button') {
+                $('#action-target-scene').val(action.target);
+            } else {
+                // Parse sprite target
+                $('#action-target-sprite').val(action.target);
+                $('#action-next-pos').val(action['next-position']);
+            }
+        }
+
+        function updateActionTypeUI() {
+            const type = $('#action-type').val();
+            if (type === 'button') {
+                $('#target-scene-group').show();
+                $('#target-sprite-group').hide();
+            } else {
+                $('#target-scene-group').hide();
+                $('#target-sprite-group').show();
+            }
+        }
+
+        $('#action-type').change(updateActionTypeUI);
+
+        // Save Action Changes
+        $('#action-label, #action-type, #action-target-scene, #action-target-sprite, #action-next-pos').on('change input', function() {
+            if (selectedActionIndex === null) return;
+            
+            const action = gameData.scene_collection.scenes[currentSceneId].actions[selectedActionIndex];
+            action.label = $('#action-label').val();
+            
+            const type = $('#action-type').val();
+            if (type === 'button') {
+                action.target = parseInt($('#action-target-scene').val()) || 1;
+                delete action['next-position'];
+            } else {
+                action.target = $('#action-target-sprite').val();
+                action['next-position'] = parseInt($('#action-next-pos').val()) || 1;
+            }
+
+            // Update button text on stage
+            $(`.action-button[data-index="${selectedActionIndex}"]`).text(action.label);
+        });
+
+        $('#btn-delete-action').click(function() {
+            if (selectedActionIndex === null) return;
+            gameData.scene_collection.scenes[currentSceneId].actions.splice(selectedActionIndex, 1);
+            loadScene(currentSceneId);
+        });
+
+        // --- Time Events ---
+        $('#btn-add-time-event').click(function() {
+            if(!currentSceneId) return;
+            const scene = gameData.scene_collection.scenes[currentSceneId];
+            if(!scene.actions) scene.actions = [];
+            
+            const delay = prompt("Retraso en milisegundos (ej: 3000):", "3000");
+            if(delay) {
+                scene.actions.push({
+                    type: "time-event",
+                    delay: parseInt(delay),
+                    target: 1 // Default
+                });
+                alert("Evento de tiempo añadido. Edítalo en el JSON final por ahora.");
+            }
+        });
+
+        // --- Export ---
+        $('#btn-export-json').click(function() {
+            const jsonStr = JSON.stringify(gameData, null, 2);
+            $('#json-textarea').val(jsonStr);
+            $('#json-output-modal').css('display', 'flex');
+        });
+
+    });
+</script>
+
+</body>
+</html>
